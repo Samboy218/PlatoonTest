@@ -1,0 +1,13 @@
+OrdererOrgs:
+    - Name: SamTest
+      Domain: samtest.com
+      Specs:
+          - Hostname: orderer
+
+PeerOrgs:
+    - Name: Org1SamTest
+      Domain: org1.samtest.com
+      Template:
+          Count: 2
+      Users:
+          Count: 2

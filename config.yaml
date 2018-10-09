@@ -1,0 +1,100 @@
+name: "Sam-PlatooningTestNetwork"
+
+description: "Initial test network for the platooning blockchain"
+
+version: 1.0.0
+
+client:
+  organization: Org1
+  logging:
+    level: info
+  peer:
+    timeout:
+      connection: 3s
+      queryResponse: 45s
+      executeTxResponse: 30s
+  eventService:
+    timeout:
+      connection: 3s
+      registrationResponse: 3s
+  orderer:
+    timeout:
+      connection: 3s
+      response: 5s
+  cryptoconfig:
+    path: "${GOPATH}/src/PlatoonTest/crypto-config"
+  credentialStore:
+    path: "/tmp/PlatoonTest-kvs"
+  cryptoStore:
+    path: "/tmp/PlatoonTest-msp"
+  BCCSP:
+    security:
+      enabled: true
+      default:
+        provider: "SW"
+      hashAlgorithm: "SHA2"
+      softVerify: true
+      ephemeral: false
+      level: 256
+  tlsCerts:
+    systemCertPool: false
+  
+channels:
+  samtest:
+    orderers:
+      - orderer.samtest.com
+    peers:
+      peer0.org1.samtest.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer1.org1.samtest.com:
+
+organizations:
+  Org1:
+    mspid: org1.samtest.com
+    cryptoPath: "peerOrganizations/org1.samtest.com/users/{userName}@org1.samtest.com/msp"
+    peers:
+      - peer0.org1.samtest.com
+      - peer1.org1.samtest.com
+    certificateAuthorities:
+      - ca.org1.samtest.com
+
+orderers:
+  orderer.samtest.com:
+    url: grpcs://localhost:7050
+    grpcOptions:
+      ssl-target-name-override: orderer.samtest.com
+      grpc-max-send-message-length: 15
+    tlsCACerts:
+      path: "${GOPATH}/src/PlatoonTest/crypto-config/ordererOrganizations/samtest.com/tlsca/tlsca.samtest.com-cert.pem"
+
+peers:
+  peer0.org1.samtest.com:
+    url: grpcs://localhost:7051
+    eventUrl: grpcs://localhost:7053
+    grpcOptions:
+      ssl-target-name-override: peer0.org1.samtest.com
+      grpc.http2.keepalive_time: 15
+    tlsCACerts:
+      path: "${GOPATH}/src/PlatoonTest/crypto-config/peerOrganizations/org1.samtest.com/tlsca/tlsca.org1.samtest.com-cert.pem"
+
+  peer1.org1.samtest.com:
+    url: grpcs://localhost:8051
+    eventUrl: grpcs://localhost:8053
+    grpcOptions:
+      ssl-target-name-override: peer1.org1.samtest.com
+      grpc.http2.keepalive_time: 15
+    tlsCACerts:
+      path: "${GOPATH}/src/PlatoonTest/crypto-config/peerOrganizations/org1.samtest.com/tlsca/tlsca.org1.samtest.com-cert.pem"
+
+certificateAuthorities:
+  ca.org1.samtest.com:
+    url: https://localhost:7054
+    httpOptions:
+      verify: false
+    registrar:
+      enrollID: admin
+      enrollSecret: adminpw
+    caName: ca.org1.samtest.com
