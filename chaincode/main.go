@@ -3,7 +3,6 @@ package main
 import (
     "fmt"
     "github.com/hyperledger/fabric/core/chaincode/shim"
-    "github.com/hyperledger/fabric/core/chaincode/lib/cid"
     pb "github.com/hyperledger/fabric/protos/peer"
     "encoding/json"
 )
@@ -68,16 +67,17 @@ func (t *SamTestChaincode) query(stub shim.ChaincodeStubInterface, args []string
 }
 
 func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-    if len(args) < 2 {
-        return shim.Error("invalid number of arguments for joinPlatoon, need at least 2")
+    if len(args) < 3 {
+        return shim.Error("invalid number of arguments for joinPlatoon, need at least 3")
     }
 
     // Get the client ID object
-    user_id, err := cid.GetID(stub)
+    //user_id, err := cid.GetID(stub)
     //user_id, err := stub.GetCreator()
-    if err != nil {
-        return shim.Error("couldn't get userID: " + err.Error())
-    }
+    user_id := args[2]
+    //if err != nil {
+    //    return shim.Error("couldn't get userID: " + err.Error())
+    //}
     state, err := stub.GetState(args[1])
     if err != nil {
         return shim.Error("couldn't get state of platoon: " + err.Error())
@@ -89,12 +89,12 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
             return shim.Error("Error decoding JSON data: " + err.Error())
         }
         for _, test := range platoonArray{
-            if test == string(user_id) {
+            if test == user_id {
                 return shim.Error("value already in platoon")
             }
         }
     }
-    platoonArray = append(platoonArray, string(user_id))
+    platoonArray = append(platoonArray, user_id)
     state, err = json.Marshal(platoonArray)
     if err != nil {
         return shim.Error("Error encoding JSON data: " + err.Error())

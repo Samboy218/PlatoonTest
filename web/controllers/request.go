@@ -20,7 +20,7 @@ func (app *Application) RequestHandler(w http.ResponseWriter, r *http.Request) {
         carID := r.FormValue("carID")
         txid, err := app.Fabric.Invoke(funcName, platID, carID)
         if err != nil {
-            http.Error(w, "unable to invoke " + funcName + " with args {" + platID + ", " + carID + "}", 500)
+            http.Error(w, "unable to invoke " + funcName + " with args {" + platID + ", " + carID + "}" + err.Error(), 500)
             return
         }
         data.TransactionID = txid

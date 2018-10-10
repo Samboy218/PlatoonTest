@@ -1,9 +1,9 @@
-ignored = ["github.com/chainHero/heroes-service/chaincode"]
+#ignored = ["github.com/chainHero/heroes-service/chaincode"]
 
-#[[constraint]]
-    #name = "github.com/hyperledger/fabric"
+[[constraint]]
+    name = "github.com/hyperledger/fabric"
     # v1.0.5
-    # revision = "014d6befcf67f3787bb3d67ff34e1a98dc6aec5f"
+     revision = "014d6befcf67f3787bb3d67ff34e1a98dc6aec5f"
     # v1.1.0
     #revision = "523f644b909d5699fbd992a011e7ed6031e96a9a"
     # v1.2.0
@@ -12,6 +12,6 @@ ignored = ["github.com/chainHero/heroes-service/chaincode"]
     #revision = "cdb4a98d99e92c9cbded171cc27959566de8a07f"
 
 [[constraint]]
-    #alpha4
     name = "github.com/hyperledger/fabric-sdk-go"
-    revision = "a906355f73d060d7bf95874a9e90dc17589edbb3"
+    #revision = "a906355f73d060d7bf95874a9e90dc17589edbb3"
+    revision = "614551a752802488988921a730b172dada7def1d"

@@ -2,7 +2,7 @@ package blockchain
 
 import (
     "fmt"
-    "github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+    "github.com/hyperledger/fabric-sdk-go/api/apitxn/chclient"
 )
 
 func (setup *FabricSetup) QueryVal(key string) (string, error) {
@@ -11,7 +11,7 @@ func (setup *FabricSetup) QueryVal(key string) (string, error) {
     args = append(args, "query")
     args = append(args, key)
 
-    response, err := setup.client.Query(channel.Request{ChaincodeID: setup.ChainCodeID, Fcn: args[0], Args: [][]byte{[]byte(args[1]), []byte(args[2])}})
+    response, err := setup.client.Query(chclient.Request{ChaincodeID: setup.ChainCodeID, Fcn: args[0], Args: [][]byte{[]byte(args[1]), []byte(args[2])}})
     if err != nil {
         return "", fmt.Errorf("failed to query: %v", err)
     }

@@ -8,19 +8,19 @@ client:
   organization: Org1
   logging:
     level: info
-#  peer:
-#    timeout:
-#      connection: 3s
-#      queryResponse: 45s
-#      executeTxResponse: 30s
-#  eventService:
-#    timeout:
-#      connection: 3s
-#      registrationResponse: 3s
-#  orderer:
-#    timeout:
-#      connection: 3s
-#      response: 5s
+  peer:
+    timeout:
+      connection: 3s
+      queryResponse: 45s
+      executeTxResponse: 30s
+  eventService:
+    timeout:
+      connection: 3s
+      registrationResponse: 3s
+  orderer:
+    timeout:
+      connection: 3s
+      response: 5s
   cryptoconfig:
     path: "${GOPATH}/src/PlatoonTest/crypto-config"
   credentialStore:
@@ -34,16 +34,15 @@ client:
         provider: "SW"
       hashAlgorithm: "SHA2"
       softVerify: true
-#      ephemeral: false
+      ephemeral: false
       level: 256
   tlsCerts:
     systemCertPool: false
-    client:
-      keyfile:
-      certfile:
   
 channels:
   samtest:
+    orderers:
+      - orderer.samtest.com
     peers:
       peer0.org1.samtest.com:
         endorsingPeer: true
@@ -51,18 +50,9 @@ channels:
         ledgerQuery: true
         eventSource: true
       peer1.org1.samtest.com:
-    policies:
-      queryChannelConfig:
-        minResponses: 1
-        maxTargets: 1
-        retryOpts:
-          attempts: 5
-          initialbackoff: 500ms
-          maxBackoff: 5s
-          backoffFactor: 2.0
 
 organizations:
-  org1:
+  Org1:
     mspid: org1.samtest.com
     cryptoPath: "peerOrganizations/org1.samtest.com/users/{userName}@org1.samtest.com/msp"
     peers:
@@ -73,77 +63,39 @@ organizations:
 
 orderers:
   orderer.samtest.com:
-    url: localhost:7050
+    url: grpcs://localhost:7050
     grpcOptions:
       ssl-target-name-override: orderer.samtest.com
-      keep-alive-time: 0s
-      keep-alive-timeout: 20s
-      keep-alive-permit: false
-      fail-fast: false
-      allow-insecure: false
+      grpc-max-send-message-length: 15
     tlsCACerts:
       path: "${GOPATH}/src/PlatoonTest/crypto-config/ordererOrganizations/samtest.com/tlsca/tlsca.samtest.com-cert.pem"
 
 peers:
   peer0.org1.samtest.com:
-    url: localhost:7051
-    eventUrl: localhost:7053
+    url: grpcs://localhost:7051
+    eventUrl: grpcs://localhost:7053
     grpcOptions:
       ssl-target-name-override: peer0.org1.samtest.com
-      keep-alive-time: 0s
-      keep-alive-timeout: 20s
-      keep-alive-permit: false
-      fail-fast: false
-      allow-insecure: false
+      grpc.http2.keepalive_time: 15
     tlsCACerts:
       path: "${GOPATH}/src/PlatoonTest/crypto-config/peerOrganizations/org1.samtest.com/tlsca/tlsca.org1.samtest.com-cert.pem"
 
   peer1.org1.samtest.com:
-    url: localhost:8051
-    eventUrl: localhost:8053
+    url: grpcs://localhost:8051
+    eventUrl: grpcs://localhost:8053
     grpcOptions:
       ssl-target-name-override: peer1.org1.samtest.com
-      keep-alive-time: 0s
-      keep-alive-timeout: 20s
-      keep-alive-permit: false
-      fail-fast: false
-      allow-insecure: false
+      grpc.http2.keepalive_time: 15
     tlsCACerts:
       path: "${GOPATH}/src/PlatoonTest/crypto-config/peerOrganizations/org1.samtest.com/tlsca/tlsca.org1.samtest.com-cert.pem"
 
 certificateAuthorities:
   ca.org1.samtest.com:
-    url: http://localhost:7054
+    url: https://localhost:7054
     httpOptions:
       verify: false
     registrar:
       enrollID: admin
       enrollSecret: adminpw
     caName: ca.org1.samtest.com
-    tlsCACerts:
-      path: ${GOPATH}/src/PlatoonTest/crypto-config/peerOrganizations/org1.samtest.com/ca/ca.org1.samtest.com-cert.pem
 
-entityMatcher:
-  peer:
-    - pattern: (\w*)peer0.org1.samtest.com(\w*)
-      urlSubstitutionExp: localhost:7051
-      eventUrlSubstitutionExp: localhost:7053
-      sslTargetOverrideUrlSubstitutionExp: peer0.org1.samtest.com
-      mappedHost: peer0.org1.samtest.com
-
-    - pattern: (\w*)peer1.org1.samtest.com(\w*)
-      urlSubstitutionExp: localhost:8051
-      eventUrlSubstitutionExp: localhost:8053
-      sslTargetOverrideUrlSubstitutionExp: peer1.org1.samtest.com
-      mappedHost: peer1.org1.samtest.com
-
-  orderer:
-    - pattern: (\w*)orderer.samtest.com(\w*)
-      urlSubstitutionExp: localhost:7050
-      sslTargetOverrideUrlSubstitutionExp: orderer.samtest.com
-      mappedHost: orderer.samtest.com
-
-  certificateAuthorities:
-    - pattern: (\w*)ca.org1.samtest.com(\w*)
-      urlSubstitutionExp: http://localhost:7054
-      mappedHost: ca.org1.samtest.com

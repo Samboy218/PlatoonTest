@@ -10,7 +10,6 @@ import (
 
 func main() {
     fSetup := blockchain.FabricSetup{
-        OrdererID: "orderer.samtest.com",
         ChannelID:  "samtest",
         ChannelConfig:  os.Getenv("GOPATH") + "/src/PlatoonTest/artifacts/samtest.channel.tx",
 
@@ -30,7 +29,6 @@ func main() {
         fmt.Printf("Unable to initialize the fabric SDK: %v\n", err)
         return
     }
-    defer fSetup.CloseSDK()
 
     err = fSetup.InstallAndInstantiateCC()
     if err != nil {
