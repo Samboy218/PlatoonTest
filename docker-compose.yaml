@@ -6,7 +6,7 @@ networks:
 services:
 
   orderer.samtest.com: 
-    image: hyperledger/fabric-orderer:x86_64-1.0.5
+    image: hyperledger/fabric-orderer:x86_64-1.1.0
     container_name: orderer.samtest.org
     environment: 
       - ORDERER_GENERAL_LOGLEVEL=debug
@@ -21,8 +21,9 @@ services:
       - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
       - ORDERER_GENERAL_TLS_CERTIFICATE/var/hyperledger/orderer/tls/server.crt
       - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - CORE_PEER_ADDRESSAUTODETECT=true
 
-    working_dir: /home/hyperledger/go/src/PlatoonTest
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric
     command: orderer
     volumes: 
       - ./artifacts/orderer.genesis.block:/var/hyperledger/orderer/orderer.genesis.block
@@ -37,7 +38,7 @@ services:
           - orderer.samtest.com
 
   ca.org1.samtest.com:
-    image: hyperledger/fabric-ca:x86_64-1.0.5
+    image: hyperledger/fabric-ca:x86_64-1.1.0
     container_name: ca.org1.samtest.com
     environment:
       - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
@@ -47,10 +48,11 @@ services:
       - FABRIC_CA_SERVER_TLS_ENABLED=true
       - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org1.samtest.com-cert.pem
       - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/3bdd03da0a728c40e1b0a85f7dac14d816202f21f4cddb202c8daa8d99e6c508_sk
+      - CORE_PEER_ADDRESSAUTODETECT=true
     ports:
       - 7054:7054
     command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
-    working_dir: /home/hyperledger/go/src/PlatoonTest
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     volumes:
       - ./crypto-config/peerOrganizations/org1.samtest.com/ca/:/etc/hyperledger/fabric-ca-server-config
     networks:
@@ -59,7 +61,7 @@ services:
           - ca.org1.samtest.com
 
   peer0.org1.samtest.com:
-    image: hyperledger/fabric-peer:x86_64-1.0.5
+    image: hyperledger/fabric-peer:x86_64-1.1.0
     container_name: peer0.org1.samtest.com
     environment:
       - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
@@ -81,7 +83,7 @@ services:
       - CORE_PEER_LOCALMSPID=org1.samtest.com
       - CORE_PEER_MSPCONFIGPATH=/var/hyperledger/msp
       - CORE_PEER_TLS_SERVERHOSTOVERRIDE=peer0.org1.samtest.com
-    working_dir: /home/hyperledger/go/src/PlatoonTest
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
     volumes:
       - /var/run/:/host/var/run/
@@ -100,7 +102,7 @@ services:
           - peer0.org1.samtest.com
 
   peer1.org1.samtest.com:
-    image: hyperledger/fabric-peer:x86_64-1.0.5
+    image: hyperledger/fabric-peer:x86_64-1.1.0
     container_name: peer1.org1.samtest.com
     environment:
       - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
@@ -122,7 +124,7 @@ services:
       - CORE_PEER_LOCALMSPID=org1.samtest.com
       - CORE_PEER_MSPCONFIGPATH=/var/hyperledger/msp
       - CORE_PEER_TLS_SERVERHOSTOVERRIDE=peer1.org1.samtest.com
-    working_dir: /home/hyperledger/go/src/PlatoonTest
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
     volumes:
       - /var/run/:/host/var/run/

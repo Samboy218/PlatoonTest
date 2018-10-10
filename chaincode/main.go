@@ -73,7 +73,7 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
     }
 
     // Get the client ID object
-    id, err := cid.GetID(stub)
+    user_id, err := cid.GetID(stub)
     //user_id, err := stub.GetCreator()
     if err != nil {
         return shim.Error("couldn't get userID: " + err.Error())

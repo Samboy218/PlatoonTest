@@ -37,6 +37,6 @@ func (setup *FabricSetup) Invoke(function string, key string, value string) (str
     case <-time.After(time.Second*20):
         return "", fmt.Errorf("did NOT receive CC event for eventID(%s)", eventID)
     }
-    setup.client.UnregisterChaincodeEvent(rce)
-    return response.TransactionID.ID, nil
+    //setup.client.UnregisterChaincodeEvent(rce)
+    return string(response.TransactionID), nil
 }

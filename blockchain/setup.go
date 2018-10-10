@@ -18,7 +18,7 @@ import (
 type FabricSetup struct {
     ConfigFile      string
     OrgID           string
-    ordererID       string
+    OrdererID       string
     ChannelID       string
     ChainCodeID     string
     initialized     bool
@@ -28,8 +28,8 @@ type FabricSetup struct {
     OrgAdmin        string
     OrgName         string
     UserName        string
-    client          chclient.Client
-    admin           resmgmt.Client
+    client          *channel.Client
+    admin           *resmgmt.Client
     sdk             *fabsdk.FabricSDK
     event           *event.Client
 }
@@ -90,7 +90,7 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
         return fmt.Errorf("failed to create chaincode package: %v", err)
     }
 
-    version := "1.29"
+    version := "1.31"
     installCCReq := resmgmt.InstallCCRequest{Name:setup.ChainCodeID, Path:setup.ChainCodePath, Version:version, Package:ccPkg}
     _, err = setup.admin.InstallCC(installCCReq)
     if err != nil {
@@ -99,8 +99,8 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 
     ccPolicy := cauthdsl.SignedByAnyMember([]string{"org1.samtest.com"})
 
-    err := setup.admin.InstantiateCC(setup.ChannelID, resmgmt.InstantiateCCRequest{Name: setup.ChainCodeID, Path: setup.ChaincodeGoPath, Version:version, Args: [][]byte{[]byte("init")}, Policy: ccPolicy})
-    if err != nil {
+    resp, err := setup.admin.InstantiateCC(setup.ChannelID, resmgmt.InstantiateCCRequest{Name: setup.ChainCodeID, Path: setup.ChainCodeGoPath, Version:version, Args: [][]byte{[]byte("init")}, Policy: ccPolicy})
+    if err != nil || resp.TransactionID == "" {
         return fmt.Errorf("failed to instantiate the chaincode: %v", err)
     }
 
@@ -121,4 +121,8 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 
 	fmt.Println("Chaincode Installation & Instantiation Successful")
     return nil
+}
+
+func (setup *FabricSetup) CloseSDK() {
+    setup.sdk.Close()
 }
