@@ -4,8 +4,13 @@ import (
     "fmt"
     "github.com/hyperledger/fabric/core/chaincode/shim"
     pb "github.com/hyperledger/fabric/protos/peer"
+    "github.com/hyperledger/fabric/protos/msp"
+    "github.com/golang/protobuf/proto"
     "encoding/json"
+    "crypto/x509"
+    "encoding/pem"
 )
+
 
 type SamTestChaincode struct {
 }
@@ -71,10 +76,28 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
         return shim.Error("invalid number of arguments for joinPlatoon, need at least 3")
     }
 
+    serializedID, err := stub.GetCreator()
+    if err != nil {
+        return shim.Error("could not get creator: " + err.Error())
+    }
+    sId := &msp.SerializedIdentity{}
+    err = proto.Unmarshal(serializedID, sId)
+    if err != nil {
+        return shim.Error("could not deserialize the sId: " + err.Error())
+    }
+    bl, _ := pem.Decode(sId.IdBytes)
+    if bl == nil {
+        return shim.Error("could not decode PEM")
+    }
+    cert, err := x509.ParseCertificate(bl.Bytes)
+    if err != nil {
+        return shim.Error("could not parse cert: " + err.Error())
+    }
     // Get the client ID object
     //user_id, err := cid.GetID(stub)
     //user_id, err := stub.GetCreator()
-    user_id := args[2]
+    user_id := string(cert.RawSubject)
+    //user_id := args[2]
     //if err != nil {
     //    return shim.Error("couldn't get userID: " + err.Error())
     //}
