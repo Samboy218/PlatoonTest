@@ -72,35 +72,14 @@ func (t *SamTestChaincode) query(stub shim.ChaincodeStubInterface, args []string
 }
 
 func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-    if len(args) < 3 {
-        return shim.Error("invalid number of arguments for joinPlatoon, need at least 3")
+    if len(args) < 2 {
+        return shim.Error("invalid number of arguments for joinPlatoon, need at least 2")
     }
-
-    serializedID, err := stub.GetCreator()
+    //get the user id
+    userID, err := getUfromCert(stub)
     if err != nil {
-        return shim.Error("could not get creator: " + err.Error())
+        return shim.Error("Error getting userID: " + err.Error())
     }
-    sId := &msp.SerializedIdentity{}
-    err = proto.Unmarshal(serializedID, sId)
-    if err != nil {
-        return shim.Error("could not deserialize the sId: " + err.Error())
-    }
-    bl, _ := pem.Decode(sId.IdBytes)
-    if bl == nil {
-        return shim.Error("could not decode PEM")
-    }
-    cert, err := x509.ParseCertificate(bl.Bytes)
-    if err != nil {
-        return shim.Error("could not parse cert: " + err.Error())
-    }
-    // Get the client ID object
-    //user_id, err := cid.GetID(stub)
-    //user_id, err := stub.GetCreator()
-    user_id := string(cert.RawSubject)
-    //user_id := args[2]
-    //if err != nil {
-    //    return shim.Error("couldn't get userID: " + err.Error())
-    //}
     state, err := stub.GetState(args[1])
     if err != nil {
         return shim.Error("couldn't get state of platoon: " + err.Error())
@@ -112,12 +91,12 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
             return shim.Error("Error decoding JSON data: " + err.Error())
         }
         for _, test := range platoonArray{
-            if test == user_id {
+            if test == userID {
                 return shim.Error("value already in platoon")
             }
         }
     }
-    platoonArray = append(platoonArray, user_id)
+    platoonArray = append(platoonArray, userID)
     state, err = json.Marshal(platoonArray)
     if err != nil {
         return shim.Error("Error encoding JSON data: " + err.Error())
@@ -137,8 +116,13 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
 }
 
 func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-    if len(args) < 3 {
-        return shim.Error("invalid number of arguments for lavePlatoon, need at least 3")
+    if len(args) < 2 {
+        return shim.Error("invalid number of arguments for lavePlatoon, need at least 2")
+    }
+    //get the user id
+    userID, err := getUfromCert(stub)
+    if err != nil {
+        return shim.Error("Error getting userID: " + err.Error())
     }
     state, err := stub.GetState(args[1])
     if err != nil {
@@ -154,7 +138,7 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     }
     inPlat := false
     for index, test := range platoonArray{
-        if test == args[2] {
+        if test == userID {
             platoonArray = append(platoonArray[:index], platoonArray[index+1:]...)
             inPlat = true
             break
@@ -205,4 +189,36 @@ func main() {
     if err != nil {
         fmt.Printf("Error starting SamTest ChainCode: %s", err)
     }
+}
+
+func getUfromCert(stub shim.ChaincodeStubInterface) (string, error) {
+    serializedID, err := stub.GetCreator()
+    if err != nil {
+        return "", fmt.Errorf("could not get creator: %v", err.Error())
+    }
+    sId := &msp.SerializedIdentity{}
+    err = proto.Unmarshal(serializedID, sId)
+    if err != nil {
+        return "", fmt.Errorf("could not deserialize the sId: %v", err.Error())
+    }
+    bl, _ := pem.Decode(sId.IdBytes)
+    if bl == nil {
+        return "", fmt.Errorf("could not decode PEM")
+    }
+    cert, err := x509.ParseCertificate(bl.Bytes)
+    if err != nil {
+        return "", fmt.Errorf("could not parse cert: %v", err.Error())
+    }
+    // Get the client ID object
+    userID := ""
+    for _, currVal := range cert.Subject.ToRDNSequence() {
+        if currVal[0].Type.String() == "2.5.4.3" {
+            userID = fmt.Sprintf("%v", currVal[0].Value)
+            break
+        }
+    }
+    if userID == "" {
+        return "", fmt.Errorf("couldn't find userID in RDNSequence")
+    }
+    return userID, nil
 }
