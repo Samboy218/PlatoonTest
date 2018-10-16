@@ -145,7 +145,7 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
         }
     }
     if inPlat != true {
-        return shim.Error("Value not in platoon, cannot leave")
+        return shim.Error(fmt.Sprintf("Value {%s} not in platoon, cannot leave", userID))
     }
     state, err = json.Marshal(platoonArray)
     if err != nil {
