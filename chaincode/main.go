@@ -61,6 +61,9 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     if args[0] == "leavePlatoon" {
         return t.leavePlatoon(stub, args)
     }
+    if args[0] == "mergePlatoon" {
+        return t.mergePlatoon(stub, args)
+    }
 
     return shim.Error("Failed to invoke, check argument 1")
 }
@@ -196,6 +199,85 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     if err != nil {
         return shim.Error(err.Error())
     }
+    return shim.Success(nil)
+}
+
+func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+    if len(args) < 2 {
+        return shim.Error("invalid number of arguments for lavePlatoon, need at least 2")
+    }
+    //get the user id
+    userID, err := getUfromCert(stub)
+    if err != nil {
+        return shim.Error("Error getting userID: " + err.Error())
+    }
+    //try to get user
+    currUser, err := getUser(stub, userID)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err.Error()))
+    }
+    if currUser.CurrPlat != args[1] {
+        return shim.Error(fmt.Sprintf("user {%s} not leader of platoon {%s}", userID, args[1]))
+    }
+    //platB is the platoon the caller is the leader of
+    //platA is args[1]
+    //platB is caller.CurPlat
+    //end result of this function is platA = [platA+platB]; platB = []
+    toMerge := currUser.CurrPlat
+    state, err := stub.GetState(toMerge)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", toMerge, err.Error()))
+    }
+    if string(state) == "" {
+        return shim.Error(fmt.Sprintf("platoon {%s} empty or doesn't exist", toMerge))
+    }
+    var platB []string
+    err = json.Unmarshal(state, &platB)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
+    }
+    var platA []string
+    state, err = stub.GetState(args[1])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", args[1], err.Error()))
+    }
+    if string(state) == "" {
+        return shim.Error(fmt.Sprintf("platoon {%s} empty or doesn't exist", args[1]))
+    }
+    err = json.Unmarshal(state, &platA)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
+    }
+    var curr platoonUser
+    for _, user := range platB {
+        //make sure all users exist and are actually in platB
+        curr, err = getUser(stub, user)
+        if err != nil {
+            return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", user, err.Error()))
+        }
+        if curr.CurrPlat != toMerge {
+            return shim.Error(fmt.Sprintf("user {%s} not in platoon {%s}, in platoon {%s}", user, toMerge, curr.CurrPlat))
+        }
+        //everything is good for this user, put them in platA
+        err = setUserPlat(stub, user, args[1])
+        if err != nil {
+            return shim.Error(fmt.Sprintf("error setting user {%s} to platoon {%s}: %v", user, args[1], err.Error()))
+        }
+        platA = append(platA, user)
+    }
+    state, err = json.Marshal(platA)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
+    }
+    err = stub.PutState(args[1], []byte(state))
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error putting platoon data: %v", err.Error()))
+    }
+    err = stub.PutState(toMerge, []byte(""))
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error putting platoon data: %v", err.Error()))
+    }
+
     return shim.Success(nil)
 }
 
