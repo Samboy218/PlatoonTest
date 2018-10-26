@@ -34,6 +34,56 @@ func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
     if err != nil {
         return shim.Error(err.Error())
     }
+
+
+    //make the dummy platoons and users
+    var fakeUsers []platoonUser
+    for i := 2; i < 16; i++ {
+        fakeUsers = append(fakeUsers, platoonUser{ID:fmt.Sprintf("User%d@org1.samtest.com", i)})
+    }
+    fakePlats := make(map[string][]string)
+    for i, user := range fakeUsers[0:5] {
+        fakePlats["plat1"] = append(fakePlats["plat1"], user.ID)
+        fakeUsers[i].CurrPlat = "plat1"
+    }
+    for i, user := range fakeUsers[5:10] {
+        fakePlats["plat2"] = append(fakePlats["plat2"], user.ID)
+        fakeUsers[i+5].CurrPlat = "plat2"
+    }
+    for i, user := range fakeUsers[10:len(fakeUsers)] {
+        fakePlats["plat3"] = append(fakePlats["plat3"], user.ID)
+        fakeUsers[i+10].CurrPlat = "plat3"
+    }
+    platList := make([]string, 0, len(fakePlats))
+    //now do each platoon
+    for k := range fakePlats {
+        platList = append(platList, k)
+        platState, err := json.Marshal(fakePlats[k])
+        if err != nil {
+            return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
+        }
+        err = stub.PutState(k, platState)
+        if err != nil {
+            return shim.Error(fmt.Sprintf("Unable to update platoon {%s}: %v", k, err.Error()))
+        }
+    }
+    state, err := json.Marshal(platList)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
+    }
+    err = stub.PutState("platoons", state)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("Unable to update platoon list: %v", err.Error()))
+    }
+    state, err = json.Marshal(fakeUsers)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
+    }
+    err = stub.PutState("users", state)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("Unable to update user list: %v", err.Error()))
+    }
+
     return shim.Success(nil)
 }
 
@@ -89,6 +139,10 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
     userID, err := getUfromCert(stub)
     if err != nil {
         return shim.Error("Error getting userID: " + err.Error())
+    }
+    err = newPlat(stub, args[1])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("Error creating platoon {%s}: %v", args[1], err.Error()))
     }
     currUser, err := getUser(stub, userID)
     if err != nil {
@@ -310,6 +364,37 @@ func newUser(stub shim.ChaincodeStubInterface, user platoonUser) error {
         return fmt.Errorf("Unable to update user list: %v", err.Error())
     }
     return nil
+}
+
+func newPlat(stub shim.ChaincodeStubInterface, platID string) error {
+    platList, err := stub.GetState("platoons")
+    if err != nil {
+        return fmt.Errorf("unable to get list of platoons: %v", err.Error())
+    }
+    var platArray []string
+    if string(platList) != "" {
+        err = json.Unmarshal(platList, &platArray)
+        if err != nil {
+            return fmt.Errorf("error decoding JSON data: %v", err.Error())
+        }
+        for _, currPlat := range platArray {
+            if currPlat == platID {
+                return nil
+            }
+        }
+    }
+    //user doesn't exist, make it
+    platArray = append(platArray, platID)
+    state, err := json.Marshal(platArray)
+    if err != nil {
+        return fmt.Errorf("error encoding JSON: %v", err.Error())
+    }
+    err = stub.PutState("platoons", state)
+    if err != nil {
+        return fmt.Errorf("Unable to update platoon list: %v", err.Error())
+    }
+    return nil
+
 }
 
 func getUser(stub shim.ChaincodeStubInterface, userID string) (platoonUser, error) {
