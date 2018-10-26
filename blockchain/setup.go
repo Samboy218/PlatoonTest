@@ -78,10 +78,10 @@ func (setup *FabricSetup) Initialize() error {
 	if err = setup.admin.JoinChannel(setup.ChannelID); err != nil {
 		return fmt.Errorf("org peers failed to join the channel: %v", err)
 	}
-
+    setup.initialized = true
 	fmt.Println("Initialization Successful")
-	setup.initialized = true
 	return nil
+
 }
 
 func (setup *FabricSetup) InstallAndInstantiateCC() error {
@@ -118,7 +118,7 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 	if err != nil {
 		return fmt.Errorf("failed to create new channel client: %v", err)
 	}
+	fmt.Println("Chaincode Installation & Instantiation Successful")   
 
-	fmt.Println("Chaincode Installation & Instantiation Successful")
 	return nil
 }

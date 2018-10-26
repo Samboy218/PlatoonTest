@@ -36,11 +36,33 @@ func main() {
         return
     }
 
+    /*
+    //attempt to create a new user
+    user2, err := fSetup.sdk.NewClient(fabsdk.WithUser("User2")).Channel(fSetup.ChannelID)
+    if err != nil {
+        return fmt.Errorf("failed to create new user {User2}: %v", err)
+    }
+    fmt.Println("Created user User2")
+    setup2 := setup
+    setup2.client = user2
+    function := "joinPlatoon"
+    platID := "abcd"
+    carID := ""
+    txID, err := setup2.Invoke(function, platID, carID)
+    if err != nil {
+        fmt.Printf("Unable to %s with args{%s, %s}: %v\n", function, platID, carID, err)
+    } else {
+        fmt.Printf("Successfully did %s with args {%s, %s} transaction ID: %s", function, platID, carID, txID)
+    }
+    */
+
+
     app := &controllers.Application {
         Fabric: &fSetup,
     }
 
     web.Serve(app)
+}
 /*
     function := "joinPlatoon"
     platID := "abcd"
@@ -117,4 +139,3 @@ func main() {
     }
 
     */
-}

@@ -19,6 +19,7 @@ type platoonUser struct {
     ID          string
     CurrPlat    string
     Reputation  int
+    Money       int
 }
 
 func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
