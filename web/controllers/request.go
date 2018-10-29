@@ -9,10 +9,12 @@ func (app *Application) RequestHandler(w http.ResponseWriter, r *http.Request) {
         TransactionID string
         Success bool
         Response bool
+        User string
     }{
         TransactionID: "",
         Success: false,
         Response: false,
+        User: app.Fabric.UserName,
     }
     if r.FormValue("submitted") == "true" {
         funcName := r.FormValue("func")

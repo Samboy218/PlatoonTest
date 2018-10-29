@@ -135,6 +135,9 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
     if len(args) < 2 {
         return shim.Error("invalid number of arguments for joinPlatoon, need at least 2")
     }
+    if args[1] == "users" || args[1] == "platoons" {
+        return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
+    }
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
@@ -200,6 +203,10 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     if len(args) < 2 {
         return shim.Error("invalid number of arguments for lavePlatoon, need at least 2")
     }
+    if args[1] == "users" || args[1] == "platoons" {
+        return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
+    }
+
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
@@ -259,8 +266,12 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
 
 func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
     if len(args) < 2 {
-        return shim.Error("invalid number of arguments for lavePlatoon, need at least 2")
+        return shim.Error("invalid number of arguments for leavePlatoon, need at least 2")
     }
+    if args[1] == "users" || args[1] == "platoons" {
+        return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
+    }
+
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
@@ -334,6 +345,44 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     }
 
     return shim.Success(nil)
+}
+
+func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+    if len(args) < 2 {
+        return shim.Error("invalid number of arguments for leavePlatoon, need at least 2")
+    }
+    if args[1] == "users" || args[1] == "platoons" {
+        return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
+    }
+    if args[1] == "" {
+        return shim.Error(fmt.Sprintf("need ID for new platoon after split"))
+    }
+    //get the user id
+    userID, err := getUfromCert(stub)
+    if err != nil {
+        return shim.Error("Error getting userID: " + err.Error())
+    }
+    //try to get user
+    currUser, err := getUser(stub, userID)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err.Error()))
+    }
+    if currUser.CurrPlat == "" {
+        return shim.Error(fmt.Sprintf("user {%s} not in any platoon", currUser.ID))
+    }
+    //get the platoon
+    state, err := stub.GetState(currUser.CurrPlat)
+    if string(state) == "" {
+        return shim.Error(fmt.Sprintf("Uhhh this is bad, user's platoon {%s} empty", currUser.CurrPlat))
+    }
+    var platB []string
+    err = json.Unmarshal(state, &platB)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
+    }
+
+  
+
 }
 
 func newUser(stub shim.ChaincodeStubInterface, user platoonUser) error {

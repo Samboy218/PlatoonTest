@@ -122,3 +122,18 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 
 	return nil
 }
+
+func (setup *FabricSetup) swapUser(user string) error {
+    //swap the "client" to a different user based on the user passed in
+    if user == "Admin" {
+        return fmt.Errorf("cannot swap client user to Admin")
+    }
+    var err error
+    oldClient := setup.client
+    setup.client, err = setup.sdk.NewClient(fabsdk.WithUser(setup.UserName)).Channel(setup.ChannelID)
+    if err != nil {
+        setup.client = oldClient
+        return fmt.Errorf("couldn't swap to user {%s}: %v", user, err.Error())
+    }
+    return nil
+}
