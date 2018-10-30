@@ -92,7 +92,8 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 		return fmt.Errorf("failed to create chaincode package: %v", err)
 	}
 
-    version := "1.92"
+    version := "2.00"
+    //yay 2.0! it doesn't mean anything though
 	// Install our chaincode on org peers
 	// The resource management client send the chaincode to all peers in its channel in order for them to store it and interact with it later
 	installCCReq := resmgmt.InstallCCRequest{Name: setup.ChainCodeID, Path: setup.ChainCodePath, Version: version, Package: ccPkg}
