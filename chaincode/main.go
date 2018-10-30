@@ -115,6 +115,9 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     if args[0] == "mergePlatoon" {
         return t.mergePlatoon(stub, args)
     }
+    if args[0] == "splitPlatoon" {
+        return t.splitPlatoon(stub, args)
+    }
 
     return shim.Error("Failed to invoke, check argument 1")
 }
@@ -282,9 +285,6 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err.Error()))
     }
-    if currUser.CurrPlat != args[1] {
-        return shim.Error(fmt.Sprintf("user {%s} not leader of platoon {%s}", userID, args[1]))
-    }
     //platB is the platoon the caller is the leader of
     //platA is args[1]
     //platB is caller.CurPlat
@@ -301,6 +301,10 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     err = json.Unmarshal(state, &platB)
     if err != nil {
         return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
+    }
+    //check if the user is the leader of tomerge
+    if currUser.ID != platB[0] {
+        return shim.Error(fmt.Sprintf("user {%s} not leader of platoon {%s}", userID, args[1]))
     }
     var platA []string
     state, err = stub.GetState(args[1])
@@ -381,7 +385,7 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
         return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
     }
 
-  
+    return shim.Success(nil) 
 
 }
 
