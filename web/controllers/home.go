@@ -2,16 +2,31 @@ package controllers
 
 import (
     "net/http"
+    "encoding/json"
+    "fmt"
 )
+
+type platoonUser struct {
+    ID          string
+    CurrPlat    string
+    Reputation  int
+    Money       int
+}
+
+type platoon struct {
+    ID string
+    Cars []string
+}
+
 
 func (app *Application) HomeHandler(w http.ResponseWriter, r *http.Request) {
     data := &struct {
-        QueryRet string
+        QueryRet platoon
         Success bool
         Response bool
         User string
     }{
-        QueryRet: "",
+        QueryRet: platoon{},
         Success: false,
         Response: false,
         User: app.Fabric.UserName,
@@ -24,8 +39,76 @@ func (app *Application) HomeHandler(w http.ResponseWriter, r *http.Request) {
             http.Error(w, "unable to invoke query with arg {" + platID +"}", 500)
             return
         }
-       
-        data.QueryRet = payload
+
+        if platID == "platoons" {
+            var platoonIDs []string
+            err = json.Unmarshal([]byte(payload), &platoonIDs)
+            if err != nil {
+                http.Error(w, fmt.Sprintf("unable to decode JSON response: %v", err), 500)
+                return
+            }
+            var platoons []platoon
+            var tempPlat platoon
+            for _, id := range platoonIDs {
+                payload, err = app.Fabric.QueryVal(id)
+                if err != nil {
+                    http.Error(w, fmt.Sprintf("unable to get platoon {%s}: %v", id, err), 500)
+                    return
+                }
+                err = json.Unmarshal([]byte(payload), &tempPlat.Cars)
+                if err != nil {
+                    http.Error(w, fmt.Sprintf("unable to decode JSON: %v", err), 500)
+                    return
+                }
+                tempPlat.ID = id
+                platoons = append(platoons, tempPlat)
+                tempPlat = platoon{}
+            }
+            dataPlat := &struct {
+                QueryRet []platoon
+                Success bool
+                Response bool
+                User string
+            }{
+                QueryRet: platoons,
+                Success: true,
+                Response: true,
+                User: app.Fabric.UserName,
+            }
+            renderTemplate(w, r, "home-platoons.html", dataPlat)
+            return
+        }
+        if platID == "users" {
+            var users  []platoonUser
+            err = json.Unmarshal([]byte(payload), &users)
+            if err != nil {
+                http.Error(w, fmt.Sprintf("unable to decode JSON response: %v", err), 500)
+                return
+            }
+            dataUser := &struct {
+                QueryRet []platoonUser
+                Success bool
+                Response bool
+                User string
+            }{
+                QueryRet: users,
+                Success: true,
+                Response: true,
+                User: app.Fabric.UserName,
+            }
+            renderTemplate(w, r, "home-users.html", dataUser)
+            return
+        }
+
+        //they are requesting a single platoon
+        var plat platoon
+        err = json.Unmarshal([]byte(payload), &plat.Cars)
+        if err != nil {
+            http.Error(w, fmt.Sprintf("error decoding JSON response: %v", err), 500)
+            return
+        }
+        plat.ID = platID
+        data.QueryRet = plat
         data.Success = true
         data.Response = true
     }
