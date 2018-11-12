@@ -38,7 +38,9 @@ client:
       level: 256
   tlsCerts:
     systemCertPool: false
-  
+
+ 
+ 
 channels:
   samtest:
     orderers:
@@ -91,7 +93,7 @@ peers:
 
 certificateAuthorities:
   ca.org1.samtest.com:
-    url: https://localhost:7054
+    url: http://localhost:7054
     httpOptions:
       verify: false
     registrar:

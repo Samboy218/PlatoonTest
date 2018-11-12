@@ -45,7 +45,7 @@ services:
       - FABRIC_CA_SERVER_CA_NAME=ca.org1.samtest.com
       - FABRIC_CA_SERVER_CA_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org1.samtest.com-cert.pem
       - FABRIC_CA_SERVER_CA_KEYFILE=/etc/hyperledger/fabric-ca-server-config/3bdd03da0a728c40e1b0a85f7dac14d816202f21f4cddb202c8daa8d99e6c508_sk
-      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_TLS_ENABLED=false
       - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org1.samtest.com-cert.pem
       - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/3bdd03da0a728c40e1b0a85f7dac14d816202f21f4cddb202c8daa8d99e6c508_sk
       - CORE_PEER_ADDRESSAUTODETECT=true

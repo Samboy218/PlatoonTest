@@ -36,6 +36,11 @@ func main() {
         return
     }
 
+    err = fSetup.NewUser("sam", "Org1")
+    if err != nil {
+        fmt.Printf("unable to make new user 'sam': %v", err)
+    }
+
     var cSetups []blockchain.ClientSetup
     var apps []*controllers.Application
     for i := 1; i < 16; i++ {
