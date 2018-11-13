@@ -36,7 +36,7 @@ func main() {
         return
     }
 
-    err = fSetup.NewUser("sam", "Org1")
+    err = fSetup.NewUser("sam", "sampw", "org1")
     if err != nil {
         fmt.Printf("unable to make new user 'sam': %v", err)
     }
@@ -56,6 +56,18 @@ func main() {
         web.Serve(app, 8000+i)
         apps = append(apps, app)
     }
+    cSetup, err := fSetup.InitializeUser("sam")
+    if err != nil {
+        fmt.Printf("Unable to create new user {sam}: %v\n", err)
+        return
+    }
+    app := &controllers.Application {
+        Fabric: &cSetup,
+    }
+    cSetups = append(cSetups, cSetup)
+    web.Serve(app, 8016)
+    apps = append(apps, app)
+
     fmt.Scanf("%s")
 }
 

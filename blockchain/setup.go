@@ -1,10 +1,10 @@
 package blockchain
 
 import (
+    //"syscall"
+    //"os"
+    "os/exec"
 	"fmt"
-    "path"
-    "encoding/pem"
-    "crypto/x509"
 	"github.com/hyperledger/fabric-sdk-go/api/apitxn/chclient"
 	chmgmt "github.com/hyperledger/fabric-sdk-go/api/apitxn/chmgmtclient"
 	resmgmt "github.com/hyperledger/fabric-sdk-go/api/apitxn/resmgmtclient"
@@ -13,7 +13,11 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/common/cauthdsl"
 	"time"
-
+    
+    /*
+    "path"
+    "encoding/pem"
+    "crypto/x509"
 	ca "github.com/hyperledger/fabric-sdk-go/api/apifabca"
 	//apiconfig "github.com/hyperledger/fabric-sdk-go/api/apiconfig"
     "github.com/hyperledger/fabric-sdk-go/pkg/fabric-client"
@@ -21,6 +25,7 @@ import (
 	cryptosuite "github.com/hyperledger/fabric-sdk-go/pkg/cryptosuite/bccsp/sw"
 	kvs "github.com/hyperledger/fabric-sdk-go/pkg/fabric-client/keyvaluestore"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabric-client/identity"
+    */
 )
 
 // FabricSetup implementation
@@ -151,16 +156,66 @@ func (setup *FabricSetup) swapUser(user string) error {
 }
 
 //i have no idea which version of fabric sdk this works for
-func (setup *FabricSetup) NewUser(userName string, org string) error {
+func (setup *FabricSetup) NewUser(userName string, secret string, org string) error {
+    binary, err := exec.LookPath("fabric-ca-client")
+    fmt.Printf(binary)
+    if err != nil {
+        return fmt.Errorf("Couldn't find fabric-ca-client")
+    }
+
+    args := []string{"enroll", "-u", "http://admin:adminpw@localhost:7054"}
+    cmd := exec.Command(binary, args...)
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        fmt.Println(fmt.Sprint(err) + ": " + string(output))
+    }
+
+    args = []string{"register", "-u", "http://localhost:7054", "--id.name", "sam", "--id.secret", "sampw", "--id.type", "user", "--id.affiliation", "org1"}
+    cmd = exec.Command(binary, args...)
+    output, err = cmd.CombinedOutput()
+    if err != nil {
+        fmt.Println(fmt.Sprint(err) + ": " + string(output))
+    }
+
+    /*
+    err = exec.Command(binary, args...).Run()
+    if err != nil {
+        fmt.Fprintln(os.Stdout)
+        fmt.Fprintln(os.Stderr)
+        fmt.Printf("Couldn't %v %v: %v", binary, args, err)
+    }
+    */
+    args = []string{"enroll", "-u", fmt.Sprintf("http://%s:%s@localhost:7054", userName, secret)}
+    cmd = exec.Command(binary, args...)
+    output, err = cmd.CombinedOutput()
+    if err != nil {
+        fmt.Println(fmt.Sprint(err) + ": " + string(output))
+    }
+
+    /*
+    err = exec.Command(binary, args...).Run()
+    if err != nil {
+        fmt.Fprintln(os.Stdout)
+        fmt.Fprintln(os.Stderr)
+        fmt.Printf("Couldn't %v %v: %v", binary, args, err)
+    }
+    */
+
+    return nil
+
+
+
+    //an error in the go sdk means that this doesn't work (even though it should)
+    /*
     cfg, err := config.FromFile(setup.ConfigFile)()
     if err != nil {
         return fmt.Errorf("couldn't get config: %v", err)
     }
-    mspID, err := cfg.MspID("Org1")
+    mspID, err := cfg.MspID("org1")
     if err != nil {
         return fmt.Errorf("mspID error: %v", err)
     }
-    caConfig, err := cfg.CAConfig("Org1")
+    caConfig, err := cfg.CAConfig("org1")
     if err != nil {
         return fmt.Errorf("CAConfig error: %v", err)
     }
@@ -188,7 +243,7 @@ func (setup *FabricSetup) NewUser(userName string, org string) error {
 	}
     client.SetStateStore(stateStore)
 
-	caClient, err := fabricCAClient.NewFabricCAClient("Org1", cfg, csp)
+	caClient, err := fabricCAClient.NewFabricCAClient("org1", cfg, csp)
 	if err != nil {
 		return fmt.Errorf("NewFabricCAClient return error: %v", err)
 	}
@@ -242,7 +297,7 @@ func (setup *FabricSetup) NewUser(userName string, org string) error {
 	registerRequest := ca.RegistrationRequest{
 		Name:        userName,
 		Type:        "user",
-		Affiliation: "Org1.samtest.com",
+		Affiliation: "org1",
 		CAName:      caConfig.CAName,
 	}
 	enrolmentSecret, err := caClient.Register(adminUser, &registerRequest)
@@ -257,6 +312,8 @@ func (setup *FabricSetup) NewUser(userName string, org string) error {
 		return fmt.Errorf("Error enroling user: %s", err.Error())
 	}
     return nil
+    */
+    //--------------------------------------------------------//
 
     //what you see below is from fabric_ca_test.go
     /*

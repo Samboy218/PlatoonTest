@@ -591,17 +591,11 @@
   analyzer-version = 1
   input-imports = [
     "github.com/golang/protobuf/proto",
-    "github.com/hyperledger/fabric-sdk-go/api/apifabca",
     "github.com/hyperledger/fabric-sdk-go/api/apitxn/chclient",
     "github.com/hyperledger/fabric-sdk-go/api/apitxn/chmgmtclient",
     "github.com/hyperledger/fabric-sdk-go/api/apitxn/resmgmtclient",
     "github.com/hyperledger/fabric-sdk-go/pkg/config",
-    "github.com/hyperledger/fabric-sdk-go/pkg/cryptosuite/bccsp/sw",
-    "github.com/hyperledger/fabric-sdk-go/pkg/fabric-ca-client",
-    "github.com/hyperledger/fabric-sdk-go/pkg/fabric-client",
     "github.com/hyperledger/fabric-sdk-go/pkg/fabric-client/ccpackager/gopackager",
-    "github.com/hyperledger/fabric-sdk-go/pkg/fabric-client/identity",
-    "github.com/hyperledger/fabric-sdk-go/pkg/fabric-client/keyvaluestore",
     "github.com/hyperledger/fabric-sdk-go/pkg/fabsdk",
     "github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/common/cauthdsl",
     "github.com/hyperledger/fabric/core/chaincode/shim",
