@@ -55,10 +55,14 @@ func (app *Application) HomeHandler(w http.ResponseWriter, r *http.Request) {
                     http.Error(w, fmt.Sprintf("unable to get platoon {%s}: %v", id, err), 500)
                     return
                 }
-                err = json.Unmarshal([]byte(payload), &tempPlat.Cars)
-                if err != nil {
-                    http.Error(w, fmt.Sprintf("unable to decode JSON: %v", err), 500)
-                    return
+                if payload != "" {
+                    err = json.Unmarshal([]byte(payload), &tempPlat.Cars)
+                    if err != nil {
+                        http.Error(w, fmt.Sprintf("unable to decode JSON: %v\n%s", err, payload), 500)
+                        return
+                    }
+                }else {
+                    tempPlat.Cars = []string{}
                 }
                 tempPlat.ID = id
                 platoons = append(platoons, tempPlat)
