@@ -11,6 +11,7 @@ type platoonUser struct {
     CurrPlat    string
     Reputation  int
     Money       int
+    LastMove    int64
 }
 
 type platoon struct {

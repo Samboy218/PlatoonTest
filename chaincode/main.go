@@ -21,18 +21,23 @@ type platoonUser struct {
     CurrPlat    string
     Reputation  int
     Money       int
-    LastMove    int
+    LastMove    int64
 }
 
 func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
     fmt.Println("##### SamTestChaincode Init #####")
 
     function, _ := stub.GetFunctionAndParameters()
+    TxTimestamp, err := stub.GetTxTimestamp()
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get Timestamp: %v", err))
+    }
+    TxTime := TxTimestamp.GetSeconds()
 
     if function != "init" {
         return shim.Error("Unknown function call")
     }
-    err := stub.PutState("hello", []byte("world"))
+    err = stub.PutState("hello", []byte("world"))
     if err != nil {
         return shim.Error(err.Error())
     }
@@ -41,7 +46,7 @@ func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
     //make the dummy platoons and users
     var fakeUsers []platoonUser
     for i := 2; i < 16; i++ {
-        fakeUsers = append(fakeUsers, platoonUser{ID:fmt.Sprintf("User%d@org1.samtest.com", i)})
+        fakeUsers = append(fakeUsers, platoonUser{ID:fmt.Sprintf("User%d@org1.samtest.com", i), LastMove:TxTime})
     }
     fakePlats := make(map[string][]string)
     for i, user := range fakeUsers[0:5] {
@@ -584,6 +589,7 @@ func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID s
         if currUser.ID == userID {
             //user exists
             t.pendingUserChanges[i].Reputation = rep
+            t.pendingUserChanges[i].Money = rep
         }
     }
     //user doesn't exist, panic
