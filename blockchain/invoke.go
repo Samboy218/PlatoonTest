@@ -34,7 +34,7 @@ func (setup *FabricSetup) Invoke(function string, key string, value string) (str
     select {
     case ccEvent := <-notifier:
         fmt.Printf("Received CC event: %s\n", ccEvent)
-    case <-time.After(time.Second*20):
+    case <-time.After(time.Second*10):
         return "", fmt.Errorf("did NOT receive CC event for eventID(%s)", eventID)
     }
     setup.client.UnregisterChaincodeEvent(rce)
@@ -69,8 +69,8 @@ func (setup *ClientSetup) Invoke(function string, key string, value string) (str
     select {
     case ccEvent := <-notifier:
         fmt.Printf("Received CC event: %s\n", ccEvent)
-    case <-time.After(time.Second*20):
-        return "", fmt.Errorf("did NOT receive CC event for eventID(%s)", eventID)
+    case <-time.After(time.Second*10):
+        return "timeout", fmt.Errorf("did NOT receive CC event for eventID(%s)", eventID)
     }
     setup.client.UnregisterChaincodeEvent(rce)
     return response.TransactionID.ID, nil
