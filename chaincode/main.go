@@ -148,6 +148,12 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
     if args[1] == "users" || args[1] == "platoons" {
         return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
     }
+    //get the time
+    txTimestamp, err := stub.GetTxTimestamp()
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get time: %v", err))
+    }
+    txTime := txTimestamp.GetSeconds()
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
@@ -160,7 +166,7 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
     currUser, err := t.getUser(stub, userID)
     if err != nil {
         if currUser.ID == "None" {
-            t.newUser(stub, platoonUser{ID:userID, CurrPlat:args[1], Reputation:0})
+            t.newUser(stub, platoonUser{ID:userID, CurrPlat:args[1], Reputation:0, LastMove:txTime})
         }else {
             return shim.Error(fmt.Sprintf("Couldn't get user {%s}: %v", userID, err.Error))
         }
@@ -169,10 +175,13 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
         if currUser.CurrPlat != "" {
             return shim.Error(fmt.Sprintf("Cannot join platoon {%s}: already in platoon {%s}", args[1], currUser.CurrPlat))
         }
-        //can't do this yet, because we need to update the user's reputation
         err = t.setUserPlat(stub, userID, args[1])
         if err != nil {
             return shim.Error(fmt.Sprintf("Couldn't set user {%s} platoon to {%s}: %v", userID, args[1], err.Error))
+        }
+        err = t.setLastMove(stub, userID, txTime)
+        if err != nil {
+            return shim.Error(fmt.Sprintf("Couldn't set user {%s}'s LastMove: %v", userID, err.Error))
         }
     }
     state, err := stub.GetState(args[1])
@@ -185,9 +194,41 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
         if err != nil {
             return shim.Error("Error decoding JSON data: " + err.Error())
         }
+        //calculate what we need to pay the driver
+        leader, err := t.getUser(stub, platoonArray[0])
+        if err != nil {
+            return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
+        }
+        var payment int
+        if len(platoonArray) > 1 {
+            payment = int((txTime - leader.LastMove)/int64(len(platoonArray)-1))
+        }else {
+            payment = 0
+        }
         for _, test := range platoonArray{
             if test == userID {
                 return shim.Error("value already in platoon")
+            }
+            if test != leader.ID {
+                //pay the driver, update timestamp
+                err = t.addUserRep(stub, leader.ID, payment)
+                if err != nil {
+                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+                }
+                err = t.addUserRep(stub, test, -1*payment)
+                if err != nil {
+                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+                }
+                err = t.setLastMove(stub, test, txTime)
+                if err != nil {
+                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+                }
+            }else {
+                err = t.setLastMove(stub, test, txTime)
+                if err != nil {
+                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+                }
+
             }
         }
     }
@@ -218,6 +259,11 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
         return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
     }
 
+    txTimestamp, err := stub.GetTxTimestamp()
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get timestamp: %v", err))
+    }
+    txTime := txTimestamp.GetSeconds()
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
@@ -247,17 +293,48 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     if err != nil {
         return shim.Error("Error decoding JSON data: " + err.Error())
     }
-    inPlat := false
+    //also pay the driver
+    leader, err := t.getUser(stub, platoonArray[0])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
+    }
+    var payment int
+    if len(platoonArray) > 1 {
+        payment = int((txTime - leader.LastMove)/int64(len(platoonArray)-1))
+    }else {
+        payment = 0
+    }
+    toLeave := -1
     for index, test := range platoonArray{
+        if test != leader.ID {
+            //pay the driver, update timestamp
+            err = t.addUserRep(stub, leader.ID, payment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.addUserRep(stub, test, -1*payment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.setLastMove(stub, test, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }else {
+            err = t.setLastMove(stub, test, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }
+
         if test == userID {
-            platoonArray = append(platoonArray[:index], platoonArray[index+1:]...)
-            inPlat = true
-            break
+            toLeave = index
         }
     }
-    if inPlat != true {
+    if toLeave == -1 {
         return shim.Error(fmt.Sprintf("Value {%s} not in platoon, cannot leave", userID))
     }
+    platoonArray = append(platoonArray[:toLeave], platoonArray[toLeave+1:]...)
     state, err = json.Marshal(platoonArray)
     if err != nil {
         return shim.Error("Error encoding JSON data")
@@ -282,6 +359,12 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     if args[1] == "users" || args[1] == "platoons" {
         return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
     }
+    //get the time
+    txTimestamp, err := stub.GetTxTimestamp()
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get time: %v", err))
+    }
+    txTime := txTimestamp.GetSeconds()
 
     //get the user id
     userID, err := getUfromCert(stub)
@@ -326,7 +409,53 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     if err != nil {
         return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
     }
+    //platA memebers need to pay up
+    platALeader, err := t.getUser(stub, platA[0])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("could not get leader of %s: %v", args[1], err))
+    }
+    var platAPayment int
+    if len(platA) > 1 {
+        platAPayment = int((txTime - platALeader.LastMove)/int64(len(platA)-1))
+    }else {
+        platAPayment = 0
+    }
+    for _, user := range platA {
+        if user != platALeader.ID {
+            //pay the driver, update timestamp
+            err = t.addUserRep(stub, platALeader.ID, platAPayment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.addUserRep(stub, user, -1*platAPayment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.setLastMove(stub, user, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }else {
+            err = t.setLastMove(stub, user, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }
+
+    }
     var curr platoonUser
+    //platB memebers need to pay up
+    platBLeader, err := t.getUser(stub, platB[0])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("could not get leader of %s: %v", toMerge, err))
+    }
+    var platBPayment int
+    if len(platB) > 1 {
+        platBPayment = int((txTime - platBLeader.LastMove)/int64(len(platB)-1))
+    }else {
+        platBPayment = 0
+    }
+
     for _, user := range platB {
         //make sure all users exist and are actually in platB
         curr, err = t.getUser(stub, user)
@@ -336,6 +465,27 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
         if curr.CurrPlat != toMerge {
             return shim.Error(fmt.Sprintf("user {%s} not in platoon {%s}, in platoon {%s}", user, toMerge, curr.CurrPlat))
         }
+        if user != platBLeader.ID {
+            //pay the driver, update timestamp
+            err = t.addUserRep(stub, platBLeader.ID, platBPayment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.addUserRep(stub, user, -1*platBPayment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.setLastMove(stub, user, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }else {
+            err = t.setLastMove(stub, user, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }
+
         platA = append(platA, user)
     }
 
@@ -375,6 +525,13 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
     if args[1] == "" {
         return shim.Error(fmt.Sprintf("need ID for new platoon after split"))
     }
+    //get the time
+    txTimestamp, err := stub.GetTxTimestamp()
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get time: %v", err))
+    }
+    txTime := txTimestamp.GetSeconds()
+
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
@@ -411,13 +568,49 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
         return shim.Error(fmt.Sprintf("Cannot split into an existing platoon"))
     }
     //now put everything from platB[currUser:] into platA
+    //also pay the leader
+    leader, err := t.getUser(stub, platB[0])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", platBID, err))
+    }
+    var payment int
+    if len(platB) > 1 {
+        payment = int((txTime - leader.LastMove)/int64(len(platB)-1))
+    }else {
+        payment = 0
+    }
+    splitInd := -1
     for i, user := range platB {
         if user == currUser.ID {
-            platA = platB[i:]
-            platB = platB[:i]
-            break
+            splitInd = i
         }
+        if user != leader.ID {
+            //pay the driver, update timestamp
+            err = t.addUserRep(stub, leader.ID, payment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.addUserRep(stub, user, -1*payment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.setLastMove(stub, user, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }else {
+            err = t.setLastMove(stub, user, txTime)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+        }
+
     }
+    if splitInd == -1 {
+        return shim.Error(fmt.Sprintf("Cannot split %s: cannot find user %s", platBID, currUser.ID))
+    }
+    platA = platB[splitInd:]
+    platB = platB[:splitInd]
     //now go through every user in platA and update their platoon
     //we now can use my function
     allUsers, err := t.getAllUsers(stub)
@@ -565,6 +758,7 @@ func (t* SamTestChaincode) setUserPlat(stub shim.ChaincodeStubInterface, userID 
         if currUser.ID == userID {
             //user exists
             t.pendingUserChanges[i].CurrPlat = platID
+            return nil
         }
     }
     //user doesn't exist, panic
@@ -590,10 +784,61 @@ func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID s
             //user exists
             t.pendingUserChanges[i].Reputation = rep
             t.pendingUserChanges[i].Money = rep
+            return nil
         }
     }
     //user doesn't exist, panic
     return fmt.Errorf("unable to find user {%s}", userID)
+}
+
+func (t* SamTestChaincode) addUserRep(stub shim.ChaincodeStubInterface, userID string, rep int) error {
+    if len(t.pendingUserChanges) == 0 {
+        userList, err := stub.GetState("users")
+        if err != nil {
+            return fmt.Errorf("unable to get list of users: %v", err.Error())
+        }
+        if string(userList) != "" {
+            err = json.Unmarshal(userList, &t.pendingUserChanges)
+            if err != nil {
+                return fmt.Errorf("error decoding JSON data: %v", err.Error())
+            }
+        }
+    }
+    for i, currUser := range t.pendingUserChanges {
+        if currUser.ID == userID {
+            //user exists
+            t.pendingUserChanges[i].Reputation += rep
+            t.pendingUserChanges[i].Money += rep
+            return nil
+        }
+    }
+    //user doesn't exist, panic
+    return fmt.Errorf("unable to find user {%s}", userID)
+}
+
+func (t *SamTestChaincode) setLastMove(stub shim.ChaincodeStubInterface, userID string, txTime int64) error {
+    if len(t.pendingUserChanges) == 0 {
+        userList, err := stub.GetState("users")
+        if err != nil {
+            return fmt.Errorf("unable to get list of users: %v", err.Error())
+        }
+        if string(userList) != "" {
+            err = json.Unmarshal(userList, &t.pendingUserChanges)
+            if err != nil {
+                return fmt.Errorf("error decoding JSON data: %v", err.Error())
+            }
+        }
+    }
+    for i, currUser := range t.pendingUserChanges {
+        if currUser.ID == userID {
+            //user exists
+            t.pendingUserChanges[i].LastMove = txTime
+            return nil
+        }
+    }
+    //user doesn't exist, panic
+    return fmt.Errorf("unable to find user {%s}", userID)
+
 }
 
 func (t *SamTestChaincode) invoke(stub shim.ChaincodeStubInterface, args []string) pb.Response {
