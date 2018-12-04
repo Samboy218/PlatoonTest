@@ -26,3 +26,18 @@ run:
 	@./PlatoonTest
 	@echo "run done."
 clean: env-down
+
+install:
+	sudo apt -y install docker.io
+	sudo apt -y install docker-compose
+	sudo usermod -a -G docker $USER
+	tar -C /usr/local -xzf install/go1.10.5.linux-amd64.tar.gz
+	echo "export GOPATH=$HOME/go" >> ~/.profile
+	echo "export PATH=$PATH:$GOPATH/bin" >> ~/.profile
+	echo "export PATH=$PATH:/usr/local/go/bin" >> ~/.profile
+	curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+	echo "Now you need to reboot and then run \033[31;1;4mmake install-images\033[0m"
+
+install-images:
+	curl -sSL http://bit.ly/2ysbOFE | bash -s 1.0.5
+
