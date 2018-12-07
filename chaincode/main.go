@@ -109,8 +109,6 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 
     if args[0] == "query" {
         return t.query(stub, args)
-    }else if args[0] == "invoke" {
-        resp = t.invoke(stub, args)
     }else if args[0] == "joinPlatoon" {
         resp = t.joinPlatoon(stub, args)
     }else if args[0] == "leavePlatoon" {
@@ -141,6 +139,11 @@ func (t *SamTestChaincode) query(stub shim.ChaincodeStubInterface, args []string
     return shim.Success(state)
 }
 
+//This function allows a user to join an existing platoon
+//PRE: The user passes the name of the platoon it wishes to join
+//POST: The user will be added to the back of the platoon
+//      The transaction will fail if any of the following occur:
+//          the user is already in a platoon
 func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
     if len(args) < 2 {
         return shim.Error("invalid number of arguments for joinPlatoon, need at least 2")
@@ -251,6 +254,12 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
 
 }
 
+//This function allows a user to leave their current platoon
+//PRE: The user passes the name of the platoon (this requirement should be removed)
+//POST: The use will no longer be a part of a platoon
+//      the transaction will fail if any of the following will occur:
+//          the user is not in a platoon
+//          the user is not in the specified platoon
 func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
     if len(args) < 2 {
         return shim.Error("invalid number of arguments for lavePlatoon, need at least 2")
@@ -352,6 +361,13 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     return shim.Success(nil)
 }
 
+//This function allows a platoon to merge with another platoon (appending to the back)
+//PRE: The user passes the name of the platoon to merge with
+//POST: The user's platoon will be appended to the target platoon, forming one platoon
+//      the transaction will fail if any of the following occur:
+//          the user is not in a platoon
+//          the user is not the leader of a platoon
+//          the target platoon doesn't exist
 func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
     if len(args) < 2 {
         return shim.Error("invalid number of arguments for leavePlatoon, need at least 2")
@@ -515,6 +531,13 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     return shim.Success(nil)
 }
 
+//This function allows a user to split a platoon into multiple platoons
+//PRE: The user passes the name of the new platoon to be created from the split
+//POST: The user's current platoon is split, with all vehicles in front of the user remaining in the old platoon
+//      and all vehicles behind the user in the new platoon, and the user is the leader of the new platoon
+//      The transaction will fail if any of the following occur:
+//          the user is not in a platoon
+//          the target platoon already exists
 func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args []string) pb.Response {
     if len(args) < 2 {
         return shim.Error("invalid number of arguments for leavePlatoon, need at least 2")
@@ -647,6 +670,8 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
 
 }
 
+//helper function, not a chaincode function
+//creates a new user in the database if it isn't already there
 func (t* SamTestChaincode) newUser(stub shim.ChaincodeStubInterface, user platoonUser) error {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
@@ -671,6 +696,8 @@ func (t* SamTestChaincode) newUser(stub shim.ChaincodeStubInterface, user platoo
     return nil
 }
 
+//helper function, not a chaincode function
+//creates a new platoon in the database if it isn't already there
 func newPlat(stub shim.ChaincodeStubInterface, platID string) error {
     platList, err := stub.GetState("platoons")
     if err != nil {
@@ -702,6 +729,8 @@ func newPlat(stub shim.ChaincodeStubInterface, platID string) error {
 
 }
 
+//helper function, not a chaincode function
+//gets a user from the database
 func (t* SamTestChaincode) getUser(stub shim.ChaincodeStubInterface, userID string) (platoonUser, error) {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
@@ -725,6 +754,8 @@ func (t* SamTestChaincode) getUser(stub shim.ChaincodeStubInterface, userID stri
     return platoonUser{ID:"None"}, fmt.Errorf("unable to find user {%s}", userID)
 }
 
+//helper function, not a chaincode function
+//gets all user from the database
 func (t* SamTestChaincode) getAllUsers(stub shim.ChaincodeStubInterface) ([]platoonUser, error) {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
@@ -741,6 +772,8 @@ func (t* SamTestChaincode) getAllUsers(stub shim.ChaincodeStubInterface) ([]plat
     return t.pendingUserChanges, nil
 }
 
+//helper function, not a chaincode function
+//sets a specific user's platoon (does not commit)
 func (t* SamTestChaincode) setUserPlat(stub shim.ChaincodeStubInterface, userID string, platID string) error {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
@@ -766,6 +799,8 @@ func (t* SamTestChaincode) setUserPlat(stub shim.ChaincodeStubInterface, userID 
 
 }
 
+//helper function, not a chaincode function
+//sets a specific user's reputation (does not commit)
 func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID string, rep int) error {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
@@ -791,6 +826,8 @@ func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID s
     return fmt.Errorf("unable to find user {%s}", userID)
 }
 
+//helper function, not a chaincode function
+//adds an amount to a specific user's reputation (does not commit)
 func (t* SamTestChaincode) addUserRep(stub shim.ChaincodeStubInterface, userID string, rep int) error {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
@@ -816,6 +853,8 @@ func (t* SamTestChaincode) addUserRep(stub shim.ChaincodeStubInterface, userID s
     return fmt.Errorf("unable to find user {%s}", userID)
 }
 
+//helper function, not a chaincode function
+//sets a specific user's lastMove timestamp (does not commit)
 func (t *SamTestChaincode) setLastMove(stub shim.ChaincodeStubInterface, userID string, txTime int64) error {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
@@ -841,6 +880,9 @@ func (t *SamTestChaincode) setLastMove(stub shim.ChaincodeStubInterface, userID 
 
 }
 
+//this is a very dangerous function. I'm removing it
+//allows arbitrary updating of database values
+/*
 func (t *SamTestChaincode) invoke(stub shim.ChaincodeStubInterface, args []string) pb.Response {
     fmt.Println("##### SamTestChaincode invoke #####")
 
@@ -860,7 +902,10 @@ func (t *SamTestChaincode) invoke(stub shim.ChaincodeStubInterface, args []strin
     return shim.Success(nil)
 
 }
+*/
 
+//helper function, not a chaincode function
+//commits all pending changes to the user database
 func (t *SamTestChaincode) commitChanges(stub shim.ChaincodeStubInterface) error {
     if len(t.pendingUserChanges) == 0 {
         return nil
@@ -877,13 +922,8 @@ func (t *SamTestChaincode) commitChanges(stub shim.ChaincodeStubInterface) error
     return nil
 }
 
-func main() {
-    err := shim.Start(new(SamTestChaincode))
-    if err != nil {
-        fmt.Printf("Error starting SamTest ChainCode: %s", err)
-    }
-}
-
+//helper function, not a chaincode function
+//uses the cert to get the username of whoever invoked this transaction
 func getUfromCert(stub shim.ChaincodeStubInterface) (string, error) {
     serializedID, err := stub.GetCreator()
     if err != nil {
@@ -916,6 +956,8 @@ func getUfromCert(stub shim.ChaincodeStubInterface) (string, error) {
     return userID, nil
 }
 
+//helper function, not a chaincode function
+//check if a string is in a slice of strings
 func contains(s []string, e string) bool {
     for _, a := range s {
         if a == e {
@@ -923,4 +965,12 @@ func contains(s []string, e string) bool {
         }
     }
     return false
+}
+
+//main
+func main() {
+    err := shim.Start(new(SamTestChaincode))
+    if err != nil {
+        fmt.Printf("Error starting SamTest ChainCode: %s", err)
+    }
 }
