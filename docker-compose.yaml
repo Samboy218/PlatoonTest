@@ -7,7 +7,7 @@ services:
 
   orderer.samtest.com: 
     image: hyperledger/fabric-orderer:x86_64-1.0.5
-    container_name: orderer.samtest.org
+    container_name: orderer.samtest.com
     environment: 
       - ORDERER_GENERAL_LOGLEVEL=debug
       - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
