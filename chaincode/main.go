@@ -14,6 +14,7 @@ import (
 
 type SamTestChaincode struct {
     pendingUserChanges []platoonUser
+    leaderBonus int
 }
 
 type platoonUser struct {
@@ -106,6 +107,8 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     if len(args) < 1 {
         return shim.Error("invalid arguments, expected at least 1")
     }
+    //leader gets a bonus per transaction
+    t.leaderBonus = 10000
 
     if args[0] == "query" {
         return t.query(stub, args)
@@ -204,7 +207,7 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
         }
         var payment int
         if len(platoonArray) > 1 {
-            payment = int((txTime - leader.LastMove)/int64(len(platoonArray)-1))
+            payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platoonArray)-1))
         }else {
             payment = 0
         }
@@ -309,7 +312,7 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     }
     var payment int
     if len(platoonArray) > 1 {
-        payment = int((txTime - leader.LastMove)/int64(len(platoonArray)-1))
+        payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platoonArray)-1))
     }else {
         payment = 0
     }
@@ -432,7 +435,7 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     }
     var platAPayment int
     if len(platA) > 1 {
-        platAPayment = int((txTime - platALeader.LastMove)/int64(len(platA)-1))
+        platAPayment = int((txTime - platALeader.LastMove + int64(t.leaderBonus))/int64(len(platA)-1))
     }else {
         platAPayment = 0
     }
@@ -598,7 +601,7 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
     }
     var payment int
     if len(platB) > 1 {
-        payment = int((txTime - leader.LastMove)/int64(len(platB)-1))
+        payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platB)-1))
     }else {
         payment = 0
     }
@@ -880,29 +883,6 @@ func (t *SamTestChaincode) setLastMove(stub shim.ChaincodeStubInterface, userID 
 
 }
 
-//this is a very dangerous function. I'm removing it
-//allows arbitrary updating of database values
-/*
-func (t *SamTestChaincode) invoke(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-    fmt.Println("##### SamTestChaincode invoke #####")
-
-    if len(args) < 3 {
-        return shim.Error("invalid number of arguments for invoke, need at least 3")
-    }
-
-    err := stub.PutState(args[1], []byte(args[2]))
-    if err != nil {
-        return shim.Error("failed to update state")
-    }
-
-    err = stub.SetEvent("eventInvoke", []byte{})
-    if err != nil {
-        return shim.Error(err.Error())
-    }
-    return shim.Success(nil)
-
-}
-*/
 
 //helper function, not a chaincode function
 //commits all pending changes to the user database
