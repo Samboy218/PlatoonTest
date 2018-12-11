@@ -13,10 +13,14 @@ type platoonUser struct {
     Money       int
     LastMove    int64
 }
-
 type platoon struct {
     ID string
-    Cars []string
+    CurrSpeed int
+    //timestamp of last change
+    LastMove int64
+    //distance (in miles) since the leaer was last payed
+    Distance int
+    Members []string
 }
 
 
@@ -57,15 +61,12 @@ func (app *Application) HomeHandler(w http.ResponseWriter, r *http.Request) {
                     return
                 }
                 if payload != "" {
-                    err = json.Unmarshal([]byte(payload), &tempPlat.Cars)
+                    err = json.Unmarshal([]byte(payload), &tempPlat)
                     if err != nil {
                         http.Error(w, fmt.Sprintf("unable to decode JSON: %v\n%s", err, payload), 500)
                         return
                     }
-                }else {
-                    tempPlat.Cars = []string{}
                 }
-                tempPlat.ID = id
                 platoons = append(platoons, tempPlat)
                 tempPlat = platoon{}
             }
@@ -107,12 +108,11 @@ func (app *Application) HomeHandler(w http.ResponseWriter, r *http.Request) {
 
         //they are requesting a single platoon
         var plat platoon
-        err = json.Unmarshal([]byte(payload), &plat.Cars)
+        err = json.Unmarshal([]byte(payload), &plat)
         if err != nil {
             http.Error(w, fmt.Sprintf("error decoding JSON response: %v", err), 500)
             return
         }
-        plat.ID = platID
         data.QueryRet = plat
         data.Success = true
         data.Response = true

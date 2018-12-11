@@ -26,7 +26,16 @@
         </div>
         <div id="collapsemain" class="panel-collapse collapse">
             <ul class="list-group">
-                {{ range .QueryRet.Cars }}
+                <li class="list-group-item">
+                    LastMoved: {{ .QueryRet.LastMove }}
+                </li>
+                <li class="list-group-item">
+                    Distance Traveled: {{ .QueryRet.Distance }}
+                </li>
+                <li class="list-group-item">
+                    Current Speed: {{ .QueryRet.CurrSpeed }}MPH
+                </li>
+                {{ range .QueryRet.Members }}
                     <li class="list-group-item">
                         {{ . }}
                     </li>

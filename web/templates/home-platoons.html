@@ -37,7 +37,17 @@
                                 </div>
                                 <div id="collapse{{ $i }}" class="panel-collapse collapse">
                                     <ul class="list-group">
-                                        {{ range $platoon.Cars }}
+                                        <li class="list-group-item">
+                                            LastMoved: {{ $platoon.LastMove }}
+                                        </li>
+                                        <li class="list-group-item">
+                                            Distance Traveled: {{ $platoon.Distance }}
+                                        </li>
+                                        <li class="list-group-item">
+                                            Current Speed: {{ $platoon.CurrSpeed }}MPH
+                                        </li>
+
+                                        {{ range $platoon.Members }}
                                         <li class="list-group-item"> {{.}} </li>
                                         {{end}}
                                     </ul>

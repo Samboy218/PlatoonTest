@@ -1,5 +1,11 @@
 package main
 
+//
+//
+//TODO: fix split, add changeSpeed
+//
+//
+
 import (
     "fmt"
     "github.com/hyperledger/fabric/core/chaincode/shim"
@@ -14,6 +20,7 @@ import (
 
 type SamTestChaincode struct {
     pendingUserChanges []platoonUser
+    pendingPlatChanges []platoon
     leaderBonus int
 }
 
@@ -23,6 +30,16 @@ type platoonUser struct {
     Reputation  int
     Money       int
     LastMove    int64
+}
+
+type platoon struct {
+    ID string
+    CurrSpeed int
+    //timestamp of last change
+    LastMove int64
+    //distance (in miles) since the leaer was last payed
+    Distance int
+    Members []string
 }
 
 func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
@@ -65,31 +82,36 @@ func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
     platList := make([]string, 0, len(fakePlats))
     //now do each platoon
     for k := range fakePlats {
+        var currPlat platoon
+        currPlat.ID = k
+        currPlat.CurrSpeed = 60
+        currPlat.Members = fakePlats[k]
+        currPlat.LastMove = TxTime
         platList = append(platList, k)
-        platState, err := json.Marshal(fakePlats[k])
+        platState, err := json.Marshal(currPlat)
         if err != nil {
-            return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
+            return shim.Error(fmt.Sprintf("error encoding JSON: %v", err))
         }
         err = stub.PutState(k, platState)
         if err != nil {
-            return shim.Error(fmt.Sprintf("Unable to update platoon {%s}: %v", k, err.Error()))
+            return shim.Error(fmt.Sprintf("Unable to update platoon {%s}: %v", k, err))
         }
     }
     state, err := json.Marshal(platList)
     if err != nil {
-        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
+        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err))
     }
     err = stub.PutState("platoons", state)
     if err != nil {
-        return shim.Error(fmt.Sprintf("Unable to update platoon list: %v", err.Error()))
+        return shim.Error(fmt.Sprintf("Unable to update platoon list: %v", err))
     }
     state, err = json.Marshal(fakeUsers)
     if err != nil {
-        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
+        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err))
     }
     err = stub.PutState("users", state)
     if err != nil {
-        return shim.Error(fmt.Sprintf("Unable to update user list: %v", err.Error()))
+        return shim.Error(fmt.Sprintf("Unable to update user list: %v", err))
     }
 
     return shim.Success(nil)
@@ -163,18 +185,18 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
-        return shim.Error("Error getting userID: " + err.Error())
+        return shim.Error(fmt.Sprintf("Error getting userID: %v", err))
     }
-    err = newPlat(stub, args[1])
+    err = t.newPlat(stub, args[1])
     if err != nil {
-        return shim.Error(fmt.Sprintf("Error creating platoon {%s}: %v", args[1], err.Error()))
+        return shim.Error(fmt.Sprintf("Error creating platoon {%s}: %v", args[1], err))
     }
     currUser, err := t.getUser(stub, userID)
     if err != nil {
         if currUser.ID == "None" {
             t.newUser(stub, platoonUser{ID:userID, CurrPlat:args[1], Reputation:0, LastMove:txTime})
         }else {
-            return shim.Error(fmt.Sprintf("Couldn't get user {%s}: %v", userID, err.Error))
+            return shim.Error(fmt.Sprintf("Couldn't get user {%s}: %v", userID, err))
         }
     }else {
         //user cannot join a platoon if they are already in another platoon
@@ -183,71 +205,46 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
         }
         err = t.setUserPlat(stub, userID, args[1])
         if err != nil {
-            return shim.Error(fmt.Sprintf("Couldn't set user {%s} platoon to {%s}: %v", userID, args[1], err.Error))
-        }
-        err = t.setLastMove(stub, userID, txTime)
-        if err != nil {
-            return shim.Error(fmt.Sprintf("Couldn't set user {%s}'s LastMove: %v", userID, err.Error))
+            return shim.Error(fmt.Sprintf("Couldn't set user {%s} platoon to {%s}: %v", userID, args[1], err))
         }
     }
-    state, err := stub.GetState(args[1])
+    //get the platoon
+    plat, err := t.getPlat(stub, args[1])
     if err != nil {
-        return shim.Error("couldn't get state of platoon: " + err.Error())
+        return shim.Error(fmt.Sprintf("Couldn't get platoon {%s}: %v", args[1], err))
     }
-    var platoonArray []string
-    if string(state) != "" {
-        err = json.Unmarshal(state, &platoonArray)
-        if err != nil {
-            return shim.Error("Error decoding JSON data: " + err.Error())
-        }
-        //calculate what we need to pay the driver
-        leader, err := t.getUser(stub, platoonArray[0])
-        if err != nil {
-            return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
-        }
-        var payment int
-        if len(platoonArray) > 1 {
-            payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platoonArray)-1))
-        }else {
-            payment = 0
-        }
-        for _, test := range platoonArray{
-            if test == userID {
-                return shim.Error("value already in platoon")
-            }
-            if test != leader.ID {
-                //pay the driver, update timestamp
-                err = t.addUserRep(stub, leader.ID, payment)
-                if err != nil {
-                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-                }
-                err = t.addUserRep(stub, test, -1*payment)
-                if err != nil {
-                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-                }
-                err = t.setLastMove(stub, test, txTime)
-                if err != nil {
-                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-                }
-            }else {
-                err = t.setLastMove(stub, test, txTime)
-                if err != nil {
-                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-                }
 
+    //calculate what we need to pay the driver
+    leader, err := t.getUser(stub, plat.Members[0])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
+    }
+    var payment int
+    if len(plat.Members) > 1 {
+        payment = int((txTime - plat.LastMove + int64(t.leaderBonus))/int64(len(plat.Members)-1))
+    }else {
+        payment = 0
+    }
+    for _, test := range plat.Members{
+        if test == userID {
+            return shim.Error("value already in platoon")
+        }
+        if test != leader.ID {
+            //pay the driver, update timestamp
+            err = t.addUserRep(stub, leader.ID, payment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            }
+            err = t.addUserRep(stub, test, -1*payment)
+            if err != nil {
+                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
             }
         }
     }
-    platoonArray = append(platoonArray, userID)
-    state, err = json.Marshal(platoonArray)
-    if err != nil {
-        return shim.Error("Error encoding JSON data: " + err.Error())
-    }
-
-    err = stub.PutState(args[1], []byte(state))
-    if err != nil {
-        return shim.Error("failed to update state: " + err.Error())
-    }
+    var newMembers []string
+    newMembers = append(plat.Members, userID)
+    t.setPlatMembers(stub, args[1], newMembers)
+    t.setPlatLastMove(stub, args[1], txTime)
 
     err = stub.SetEvent("eventInvoke", []byte{})
     if err != nil {
@@ -279,45 +276,38 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
-        return shim.Error("Error getting userID: " + err.Error())
+        return shim.Error(fmt.Sprintf("Error getting userID: %v", err))
     }
     //try to get user
     currUser, err := t.getUser(stub, userID)
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err.Error()))
+        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err))
     }
     if currUser.CurrPlat != args[1] {
         return shim.Error(fmt.Sprintf("user {%s} cant leave platoon {%s}: not in platoon", userID, args[1]))
     }
     err = t.setUserPlat(stub, userID, "")
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't set user {%s} to leave platoon {%s}: %v", userID, args[1], err.Error()))
+        return shim.Error(fmt.Sprintf("couldn't set user {%s} to leave platoon {%s}: %v", userID, args[1], err))
     }
-    state, err := stub.GetState(args[1])
+    plat, err := t.getPlat(stub, args[1])
     if err != nil {
-        return shim.Error("couldn't get state of platoon")
+        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", args[1], err))
     }
-    if string(state) == "" {
-        return shim.Error("platoon is empty")
-    }
-    var platoonArray []string
-    err = json.Unmarshal(state, &platoonArray)
-    if err != nil {
-        return shim.Error("Error decoding JSON data: " + err.Error())
-    }
+
     //also pay the driver
-    leader, err := t.getUser(stub, platoonArray[0])
+    leader, err := t.getUser(stub, plat.Members[0])
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
     }
     var payment int
-    if len(platoonArray) > 1 {
-        payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platoonArray)-1))
+    if len(plat.Members) > 1 {
+        payment = int((txTime - plat.LastMove + int64(t.leaderBonus))/int64(len(plat.Members)-1))
     }else {
         payment = 0
     }
     toLeave := -1
-    for index, test := range platoonArray{
+    for index, test := range plat.Members{
         if test != leader.ID {
             //pay the driver, update timestamp
             err = t.addUserRep(stub, leader.ID, payment)
@@ -325,15 +315,6 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
                 return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
             }
             err = t.addUserRep(stub, test, -1*payment)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
-            err = t.setLastMove(stub, test, txTime)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
-        }else {
-            err = t.setLastMove(stub, test, txTime)
             if err != nil {
                 return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
             }
@@ -346,16 +327,9 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     if toLeave == -1 {
         return shim.Error(fmt.Sprintf("Value {%s} not in platoon, cannot leave", userID))
     }
-    platoonArray = append(platoonArray[:toLeave], platoonArray[toLeave+1:]...)
-    state, err = json.Marshal(platoonArray)
-    if err != nil {
-        return shim.Error("Error encoding JSON data")
-    }
-
-    err = stub.PutState(args[1], []byte(state))
-    if err != nil {
-        return shim.Error("failed to update state")
-    }
+    newMembers := append(plat.Members[:toLeave], plat.Members[toLeave+1:]...)
+    t.setPlatMembers(stub, args[1], newMembers)
+    t.setPlatLastMove(stub, args[1], txTime)
 
     err = stub.SetEvent("eventInvoke", []byte{})
     if err != nil {
@@ -388,58 +362,41 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
-        return shim.Error("Error getting userID: " + err.Error())
+        return shim.Error(fmt.Sprintf("Error getting userID: %v", err))
     }
     //try to get user
     currUser, err := t.getUser(stub, userID)
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err.Error()))
+        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err))
     }
     //platB is the platoon the caller is the leader of
     //platA is args[1]
     //platB is caller.CurPlat
     //end result of this function is platA = [platA+platB]; platB = []
     toMerge := currUser.CurrPlat
-    state, err := stub.GetState(toMerge)
-    if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", toMerge, err.Error()))
-    }
-    if string(state) == "" {
-        return shim.Error(fmt.Sprintf("platoon {%s} empty or doesn't exist", toMerge))
-    }
-    var platB []string
-    err = json.Unmarshal(state, &platB)
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
-    }
+    platB, err := t.getPlat(stub, toMerge)
+
     //check if the user is the leader of tomerge
-    if currUser.ID != platB[0] {
+    if currUser.ID != platB.Members[0] {
         return shim.Error(fmt.Sprintf("user {%s} not leader of platoon {%s}", userID, args[1]))
     }
-    var platA []string
-    state, err = stub.GetState(args[1])
+    platA, err := t.getPlat(stub, args[1])
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", args[1], err.Error()))
+        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", args[1], err))
     }
-    if string(state) == "" {
-        return shim.Error(fmt.Sprintf("platoon {%s} empty or doesn't exist", args[1]))
-    }
-    err = json.Unmarshal(state, &platA)
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
-    }
+
     //platA memebers need to pay up
-    platALeader, err := t.getUser(stub, platA[0])
+    platALeader, err := t.getUser(stub, platA.Members[0])
     if err != nil {
         return shim.Error(fmt.Sprintf("could not get leader of %s: %v", args[1], err))
     }
     var platAPayment int
-    if len(platA) > 1 {
-        platAPayment = int((txTime - platALeader.LastMove + int64(t.leaderBonus))/int64(len(platA)-1))
+    if len(platA.Members) > 1 {
+        platAPayment = int((txTime - platA.LastMove + int64(t.leaderBonus))/int64(len(platA.Members)-1))
     }else {
         platAPayment = 0
     }
-    for _, user := range platA {
+    for _, user := range platA.Members {
         if user != platALeader.ID {
             //pay the driver, update timestamp
             err = t.addUserRep(stub, platALeader.ID, platAPayment)
@@ -450,36 +407,27 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
             if err != nil {
                 return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
             }
-            err = t.setLastMove(stub, user, txTime)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
-        }else {
-            err = t.setLastMove(stub, user, txTime)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
         }
-
     }
+    t.setPlatLastMove(stub, args[1], txTime)
     var curr platoonUser
     //platB memebers need to pay up
-    platBLeader, err := t.getUser(stub, platB[0])
+    platBLeader, err := t.getUser(stub, platB.Members[0])
     if err != nil {
         return shim.Error(fmt.Sprintf("could not get leader of %s: %v", toMerge, err))
     }
     var platBPayment int
-    if len(platB) > 1 {
-        platBPayment = int((txTime - platBLeader.LastMove)/int64(len(platB)-1))
+    if len(platB.Members) > 1 {
+        platBPayment = int((txTime - platB.LastMove + int64(t.leaderBonus))/int64(len(platB.Members)-1))
     }else {
         platBPayment = 0
     }
-
-    for _, user := range platB {
+    newPlatA := platA.Members
+    for _, user := range platB.Members {
         //make sure all users exist and are actually in platB
         curr, err = t.getUser(stub, user)
         if err != nil {
-            return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", user, err.Error()))
+            return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", user, err))
         }
         if curr.CurrPlat != toMerge {
             return shim.Error(fmt.Sprintf("user {%s} not in platoon {%s}, in platoon {%s}", user, toMerge, curr.CurrPlat))
@@ -494,41 +442,21 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
             if err != nil {
                 return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
             }
-            err = t.setLastMove(stub, user, txTime)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
-        }else {
-            err = t.setLastMove(stub, user, txTime)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
         }
 
-        platA = append(platA, user)
+        newPlatA = append(newPlatA, user)
+    }
+    t.setPlatMembers(stub, args[1], newPlatA)
+    t.setPlatLastMove(stub, toMerge, txTime)
+    for _, user := range newPlatA {
+        t.setUserPlat(stub, user, args[1])
     }
 
-    allUsers, err := t.getAllUsers(stub)
-    if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get all users: %v", err))
-    }
-    for _, user := range allUsers {
-        if contains(platA, user.ID) {
-            t.setUserPlat(stub, user.ID, args[1])
-        }
-    }
+    t.setPlatMembers(stub, toMerge, []string{})
 
-    state, err = json.Marshal(platA)
+    err = stub.SetEvent("eventInvoke", []byte{})
     if err != nil {
-        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
-    }
-    err = stub.PutState(args[1], []byte(state))
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error putting platoon data: %v", err.Error()))
-    }
-    err = stub.PutState(toMerge, []byte(""))
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error putting platoon data: %v", err.Error()))
+        return shim.Error(err.Error())
     }
 
     return shim.Success(nil)
@@ -561,52 +489,52 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
     //get the user id
     userID, err := getUfromCert(stub)
     if err != nil {
-        return shim.Error("Error getting userID: " + err.Error())
+        return shim.Error(fmt.Sprintf("Error getting userID: %v", err))
     }
     //try to get user
     currUser, err := t.getUser(stub, userID)
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err.Error()))
+        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err))
     }
+    //try to create the new plat
+    err = t.newPlat(stub, args[1])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error creating new plat {%s}: %v", args[1], err))
+    }
+
     platBID := currUser.CurrPlat
     if platBID == "" {
         return shim.Error(fmt.Sprintf("user {%s} not in any platoon", currUser.ID))
     }
     //get the platoon
-    state, err := stub.GetState(platBID)
-    if string(state) == "" {
-        return shim.Error(fmt.Sprintf("Uhhh this is bad, user's platoon {%s} empty", currUser.CurrPlat))
-    }
-    var platB []string
-    err = json.Unmarshal(state, &platB)
+    platB, err := t.getPlat(stub, platBID)
     if err != nil {
-        return shim.Error(fmt.Sprintf("error decoding json: %v", err.Error()))
+        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", platBID, err))
     }
 
     //okay we have their platoon
     //we can't split into an existing platoon
-    var platA []string
-    state, err = stub.GetState(args[1])
+    platA, err := t.getPlat(stub, args[1])
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get state of {%s}: %v", args[1], err))
     }
-    if string(state) != "" {
-        return shim.Error(fmt.Sprintf("Cannot split into an existing platoon"))
+    if len(platA.Members) > 0 {
+        return shim.Error(fmt.Sprintf("cannot split into existing platoon"))
     }
     //now put everything from platB[currUser:] into platA
     //also pay the leader
-    leader, err := t.getUser(stub, platB[0])
+    leader, err := t.getUser(stub, platB.Members[0])
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", platBID, err))
     }
     var payment int
-    if len(platB) > 1 {
-        payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platB)-1))
+    if len(platB.Members) > 1 {
+        payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platB.Members)-1))
     }else {
         payment = 0
     }
     splitInd := -1
-    for i, user := range platB {
+    for i, user := range platB.Members {
         if user == currUser.ID {
             splitInd = i
         }
@@ -620,53 +548,29 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
             if err != nil {
                 return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
             }
-            err = t.setLastMove(stub, user, txTime)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
-        }else {
-            err = t.setLastMove(stub, user, txTime)
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
-            }
         }
-
     }
     if splitInd == -1 {
         return shim.Error(fmt.Sprintf("Cannot split %s: cannot find user %s", platBID, currUser.ID))
     }
-    platA = platB[splitInd:]
-    platB = platB[:splitInd]
+    newPlatA := platB.Members[splitInd:]
+    newPlatB := platB.Members[:splitInd]
+    t.setPlatMembers(stub, args[1], newPlatA)
+    t.setPlatMembers(stub, platBID, newPlatB)
+    t.setLastMove(stub, args[1], txTime)
+    t.setLastMove(stub, platBID, txTime)
     //now go through every user in platA and update their platoon
     //we now can use my function
-    allUsers, err := t.getAllUsers(stub)
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error getting all users: %v", err))
-    }
-    for _, user := range allUsers {
-        if contains(platA, user.ID) {
-            t.setUserPlat(stub, user.ID, args[1])
+    for _, user := range newPlatA {
+        err = t.setUserPlat(stub, user, args[1])
+        if err != nil {
+            return shim.Error(fmt.Sprintf("could not set platoon for user {%s}: %v", user, err))
         }
     }
-    state, err = json.Marshal(platA)
+
+    err = stub.SetEvent("eventInvoke", []byte{})
     if err != nil {
-        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
-    }
-    err = stub.PutState(args[1], []byte(state))
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error putting platoon data: %v", err.Error()))
-    }
-    state, err = json.Marshal(platB)
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error encoding JSON: %v", err.Error()))
-    }
-    err = stub.PutState(platBID, []byte(state))
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error putting platoon data: %v", err.Error()))
-    }
-    err = newPlat(stub, args[1])
-    if err != nil {
-        return shim.Error(fmt.Sprintf("error creating new plat {%s}: %v", args[1], err))
+        return shim.Error(err.Error())
     }
 
     return shim.Success(nil) 
@@ -679,12 +583,12 @@ func (t* SamTestChaincode) newUser(stub shim.ChaincodeStubInterface, user platoo
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
-            return fmt.Errorf("unable to get list of users: %v", err.Error())
+            return fmt.Errorf("unable to get list of users: %v", err)
         }
         if string(userList) != "" {
             err = json.Unmarshal(userList, &t.pendingUserChanges)
             if err != nil {
-                return fmt.Errorf("error decoding JSON data: %v", err.Error())
+                return fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
@@ -701,16 +605,16 @@ func (t* SamTestChaincode) newUser(stub shim.ChaincodeStubInterface, user platoo
 
 //helper function, not a chaincode function
 //creates a new platoon in the database if it isn't already there
-func newPlat(stub shim.ChaincodeStubInterface, platID string) error {
+func (t* SamTestChaincode) newPlat(stub shim.ChaincodeStubInterface, platID string) error {
     platList, err := stub.GetState("platoons")
     if err != nil {
-        return fmt.Errorf("unable to get list of platoons: %v", err.Error())
+        return fmt.Errorf("unable to get list of platoons: %v", err)
     }
     var platArray []string
     if string(platList) != "" {
         err = json.Unmarshal(platList, &platArray)
         if err != nil {
-            return fmt.Errorf("error decoding JSON data: %v", err.Error())
+            return fmt.Errorf("error decoding JSON data: %v", err)
         }
         for _, currPlat := range platArray {
             if currPlat == platID {
@@ -718,16 +622,154 @@ func newPlat(stub shim.ChaincodeStubInterface, platID string) error {
             }
         }
     }
-    //user doesn't exist, make it
+    //plat doesn't exist, make it
     platArray = append(platArray, platID)
     state, err := json.Marshal(platArray)
     if err != nil {
-        return fmt.Errorf("error encoding JSON: %v", err.Error())
+        return fmt.Errorf("error encoding JSON: %v", err)
     }
     err = stub.PutState("platoons", state)
     if err != nil {
-        return fmt.Errorf("Unable to update platoon list: %v", err.Error())
+        return fmt.Errorf("Unable to update platoon list: %v", err)
     }
+    var plat platoon
+    plat.ID = platID
+    plat.CurrSpeed = 60
+    txTimestamp, err := stub.GetTxTimestamp()
+    if err != nil {
+        return fmt.Errorf("couldn't get time: %v", err)
+    }
+    txTime := txTimestamp.GetSeconds()
+    plat.LastMove = txTime
+    plat.Members = nil
+    t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
+    return nil
+
+}
+
+//helper function, not a chaincode function
+//gets a platoon from the database
+func (t* SamTestChaincode) getPlat(stub shim.ChaincodeStubInterface, platID string) (platoon, error) {
+    for _, currPlat := range t.pendingPlatChanges {
+        if currPlat.ID == platID {
+            //user exists in pending changes
+            return currPlat, nil
+        }
+    }
+
+    platData, err := stub.GetState(platID)
+    if err != nil {
+        return platoon{}, fmt.Errorf("unable to get platoon {%s}: %v", platID, err)
+    }
+    var plat platoon
+    if string(platData) != "" {
+        err = json.Unmarshal(platData, &plat)
+        if err != nil {
+            return platoon{}, fmt.Errorf("error decoding JSON data: %v", err)
+        }
+    }
+    t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
+    return plat, nil
+}
+
+func (t* SamTestChaincode) setPlatSpeed(stub shim.ChaincodeStubInterface, platID string, speed int) error {
+    for i, currPlat := range t.pendingPlatChanges {
+        if currPlat.ID == platID {
+            //plat exists in pending changes
+            t.pendingPlatChanges[i].CurrSpeed = speed
+            return nil
+        }
+    }
+
+    platData, err := stub.GetState(platID)
+    if err != nil {
+        return fmt.Errorf("unable to get platoon {%s}: %v", platID, err)
+    }
+    var plat platoon
+    if string(platData) != "" {
+        err = json.Unmarshal(platData, &plat)
+        if err != nil {
+            return fmt.Errorf("error decoding JSON data: %v", err)
+        }
+    }
+    plat.CurrSpeed = speed
+    t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
+    return nil
+
+}
+
+func (t* SamTestChaincode) setPlatLastMove(stub shim.ChaincodeStubInterface, platID string, time int64) error {
+    for i, currPlat := range t.pendingPlatChanges {
+        if currPlat.ID == platID {
+            //plat exists in pending changes
+            t.pendingPlatChanges[i].LastMove = time
+            return nil
+        }
+    }
+
+    platData, err := stub.GetState(platID)
+    if err != nil {
+        return fmt.Errorf("unable to get platoon {%s}: %v", platID, err)
+    }
+    var plat platoon
+    if string(platData) != "" {
+        err = json.Unmarshal(platData, &plat)
+        if err != nil {
+            return fmt.Errorf("error decoding JSON data: %v", err)
+        }
+    }
+    plat.LastMove = time
+    t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
+    return nil
+}
+
+func (t* SamTestChaincode) setPlatDistance(stub shim.ChaincodeStubInterface, platID string, distance int) error {
+    for i, currPlat := range t.pendingPlatChanges {
+        if currPlat.ID == platID {
+            //plat exists in pending changes
+            t.pendingPlatChanges[i].Distance = distance
+            return nil
+        }
+    }
+
+    platData, err := stub.GetState(platID)
+    if err != nil {
+        return fmt.Errorf("unable to get platoon {%s}: %v", platID, err)
+    }
+    var plat platoon
+    if string(platData) != "" {
+        err = json.Unmarshal(platData, &plat)
+        if err != nil {
+            return fmt.Errorf("error decoding JSON data: %v", err)
+        }
+    }
+    plat.Distance = distance
+    t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
+    return nil
+}
+
+func (t* SamTestChaincode) setPlatMembers(stub shim.ChaincodeStubInterface, platID string, members []string) error {
+    for i, currPlat := range t.pendingPlatChanges {
+        if currPlat.ID == platID {
+            //plat exists in pending changes
+            t.pendingPlatChanges[i].Members = members
+            return nil
+        }
+    }
+
+    platData, err := stub.GetState(platID)
+    if err != nil {
+        return fmt.Errorf("unable to get platoon {%s}: %v", platID, err)
+    }
+    var plat platoon
+    if string(platData) != "" {
+        err = json.Unmarshal(platData, &plat)
+        if err != nil {
+            return fmt.Errorf("error decoding JSON data: %v", err)
+        }
+    }
+    plat.Members = members
+    t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
     return nil
 
 }
@@ -738,12 +780,12 @@ func (t* SamTestChaincode) getUser(stub shim.ChaincodeStubInterface, userID stri
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
-            return platoonUser{}, fmt.Errorf("unable to get list of users: %v", err.Error())
+            return platoonUser{}, fmt.Errorf("unable to get list of users: %v", err)
         }
         if string(userList) != "" {
             err = json.Unmarshal(userList, &t.pendingUserChanges)
             if err != nil {
-                return platoonUser{}, fmt.Errorf("error decoding JSON data: %v", err.Error())
+                return platoonUser{}, fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
@@ -763,12 +805,12 @@ func (t* SamTestChaincode) getAllUsers(stub shim.ChaincodeStubInterface) ([]plat
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
-            return []platoonUser{}, fmt.Errorf("unable to get list of users: %v", err.Error())
+            return []platoonUser{}, fmt.Errorf("unable to get list of users: %v", err)
         }
         if string(userList) != "" {
             err = json.Unmarshal(userList, &t.pendingUserChanges)
             if err != nil {
-                return []platoonUser{}, fmt.Errorf("error decoding JSON data: %v", err.Error())
+                return []platoonUser{}, fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
@@ -781,12 +823,12 @@ func (t* SamTestChaincode) setUserPlat(stub shim.ChaincodeStubInterface, userID 
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
-            return fmt.Errorf("unable to get list of users: %v", err.Error())
+            return fmt.Errorf("unable to get list of users: %v", err)
         }
         if string(userList) != "" {
             err = json.Unmarshal(userList, &t.pendingUserChanges)
             if err != nil {
-                return fmt.Errorf("error decoding JSON data: %v", err.Error())
+                return fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
@@ -808,12 +850,12 @@ func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID s
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
-            return fmt.Errorf("unable to get list of users: %v", err.Error())
+            return fmt.Errorf("unable to get list of users: %v", err)
         }
         if string(userList) != "" {
             err = json.Unmarshal(userList, &t.pendingUserChanges)
             if err != nil {
-                return fmt.Errorf("error decoding JSON data: %v", err.Error())
+                return fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
@@ -835,12 +877,12 @@ func (t* SamTestChaincode) addUserRep(stub shim.ChaincodeStubInterface, userID s
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
-            return fmt.Errorf("unable to get list of users: %v", err.Error())
+            return fmt.Errorf("unable to get list of users: %v", err)
         }
         if string(userList) != "" {
             err = json.Unmarshal(userList, &t.pendingUserChanges)
             if err != nil {
-                return fmt.Errorf("error decoding JSON data: %v", err.Error())
+                return fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
@@ -862,12 +904,12 @@ func (t *SamTestChaincode) setLastMove(stub shim.ChaincodeStubInterface, userID 
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
-            return fmt.Errorf("unable to get list of users: %v", err.Error())
+            return fmt.Errorf("unable to get list of users: %v", err)
         }
         if string(userList) != "" {
             err = json.Unmarshal(userList, &t.pendingUserChanges)
             if err != nil {
-                return fmt.Errorf("error decoding JSON data: %v", err.Error())
+                return fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
@@ -887,17 +929,28 @@ func (t *SamTestChaincode) setLastMove(stub shim.ChaincodeStubInterface, userID 
 //helper function, not a chaincode function
 //commits all pending changes to the user database
 func (t *SamTestChaincode) commitChanges(stub shim.ChaincodeStubInterface) error {
-    if len(t.pendingUserChanges) == 0 {
-        return nil
+    if len(t.pendingUserChanges) > 0 {
+        //something has tried to change the users, we need to push that change
+        state, err := json.Marshal(t.pendingUserChanges)
+        if err != nil {
+            return fmt.Errorf("unable to encode JSON: %v", err)
+        }
+        err = stub.PutState("users", state)
+        if err != nil {
+            return fmt.Errorf("Unable to update user list: %v", err)
+        }
     }
-    //something has tried to change the users, we need to push that change
-    state, err := json.Marshal(t.pendingUserChanges)
-    if err != nil {
-        return fmt.Errorf("unable to encode JSON: %v", err.Error())
-    }
-    err = stub.PutState("users", state)
-    if err != nil {
-        return fmt.Errorf("Unable to update user list: %v", err.Error())
+    if len(t.pendingPlatChanges) > 0 {
+        for _, curr := range t.pendingPlatChanges {
+            state, err := json.Marshal(curr)
+            if err != nil {
+                return fmt.Errorf("unable to encode JSON: %v", err)
+            }
+            err = stub.PutState(curr.ID, state)
+            if err != nil {
+                return fmt.Errorf("unable to update platoon {%s}: %v", curr.ID, err)
+            }
+        }
     }
     return nil
 }
@@ -907,12 +960,12 @@ func (t *SamTestChaincode) commitChanges(stub shim.ChaincodeStubInterface) error
 func getUfromCert(stub shim.ChaincodeStubInterface) (string, error) {
     serializedID, err := stub.GetCreator()
     if err != nil {
-        return "", fmt.Errorf("could not get creator: %v", err.Error())
+        return "", fmt.Errorf("could not get creator: %v", err)
     }
     sId := &msp.SerializedIdentity{}
     err = proto.Unmarshal(serializedID, sId)
     if err != nil {
-        return "", fmt.Errorf("could not deserialize the sId: %v", err.Error())
+        return "", fmt.Errorf("could not deserialize the sId: %v", err)
     }
     bl, _ := pem.Decode(sId.IdBytes)
     if bl == nil {
@@ -920,7 +973,7 @@ func getUfromCert(stub shim.ChaincodeStubInterface) (string, error) {
     }
     cert, err := x509.ParseCertificate(bl.Bytes)
     if err != nil {
-        return "", fmt.Errorf("could not parse cert: %v", err.Error())
+        return "", fmt.Errorf("could not parse cert: %v", err)
     }
     // Get the client ID object
     userID := ""
