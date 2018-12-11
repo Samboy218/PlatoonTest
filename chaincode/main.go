@@ -22,14 +22,14 @@ import (
 type SamTestChaincode struct {
     pendingUserChanges []platoonUser
     pendingPlatChanges []platoon
-    leaderBonus int
+    leaderBonus float64
 }
 
 type platoonUser struct {
     ID          string
     CurrPlat    string
-    Reputation  int
-    Money       int
+    Reputation  float64
+    Money       float64
     LastMove    int64
 }
 
@@ -131,7 +131,7 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
         return shim.Error("invalid arguments, expected at least 1")
     }
     //leader gets a bonus per transaction
-    t.leaderBonus = 10000
+    t.leaderBonus = .01
 
     if args[0] == "query" {
         return t.query(stub, args)
@@ -222,9 +222,13 @@ func (t *SamTestChaincode) joinPlatoon(stub shim.ChaincodeStubInterface, args []
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
     }
-    var payment int
+    var payment float64
+    timeSince := txTime - plat.LastMove
+    //convert seconds->hours, multiply by mph
+    distanceTraveled := float64(timeSince)/3600 * float64(plat.CurrSpeed)
+    distanceTraveled += plat.Distance
     if len(plat.Members) > 1 {
-        payment = int((txTime - plat.LastMove + int64(t.leaderBonus))/int64(len(plat.Members)-1))
+        payment = (distanceTraveled + t.leaderBonus)/float64(len(plat.Members)-1)
     }else {
         payment = 0
     }
@@ -303,9 +307,14 @@ func (t *SamTestChaincode) leavePlatoon(stub shim.ChaincodeStubInterface, args [
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
     }
-    var payment int
+
+    var payment float64
+    timeSince := txTime - plat.LastMove
+    //convert seconds->hours, multiply by mph
+    distanceTraveled := float64(timeSince)/3600 * float64(plat.CurrSpeed)
+    distanceTraveled += plat.Distance
     if len(plat.Members) > 1 {
-        payment = int((txTime - plat.LastMove + int64(t.leaderBonus))/int64(len(plat.Members)-1))
+        payment = (distanceTraveled + t.leaderBonus)/float64(len(plat.Members)-1)
     }else {
         payment = 0
     }
@@ -393,12 +402,18 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
     if err != nil {
         return shim.Error(fmt.Sprintf("could not get leader of %s: %v", args[1], err))
     }
-    var platAPayment int
+
+    var platAPayment float64
+    timeSince := txTime - platA.LastMove
+    //convert seconds->hours, multiply by mph
+    distanceTraveled := float64(timeSince)/3600 * float64(platA.CurrSpeed)
+    distanceTraveled += platA.Distance
     if len(platA.Members) > 1 {
-        platAPayment = int((txTime - platA.LastMove + int64(t.leaderBonus))/int64(len(platA.Members)-1))
+        platAPayment = (distanceTraveled + t.leaderBonus)/float64(len(platA.Members)-1)
     }else {
         platAPayment = 0
     }
+
     for _, user := range platA.Members {
         if user != platALeader.ID {
             //pay the driver, update timestamp
@@ -412,18 +427,34 @@ func (t *SamTestChaincode) mergePlatoon(stub shim.ChaincodeStubInterface, args [
             }
         }
     }
-    t.setPlatLastMove(stub, args[1], txTime)
+    err = t.setPlatLastMove(stub, args[1], txTime)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("Could not set last move of {%s}: %v", args[1], err))
+    }
+    err = t.setPlatDistance(stub, args[1], 0)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("Could not set distance of {%s}: %v", args[1], err))
+    }
     var curr platoonUser
     //platB memebers need to pay up
     platBLeader, err := t.getUser(stub, platB.Members[0])
     if err != nil {
         return shim.Error(fmt.Sprintf("could not get leader of %s: %v", toMerge, err))
     }
-    var platBPayment int
+
+    var platBPayment float64
+    timeSince = txTime - platB.LastMove
+    //convert seconds->hours, multiply by mph
+    distanceTraveled = float64(timeSince)/3600 * float64(platB.CurrSpeed)
+    distanceTraveled += platB.Distance
     if len(platB.Members) > 1 {
-        platBPayment = int((txTime - platB.LastMove + int64(t.leaderBonus))/int64(len(platB.Members)-1))
+        platBPayment = (distanceTraveled + t.leaderBonus)/float64(len(platB.Members)-1)
     }else {
         platBPayment = 0
+    }
+    err = t.setPlatDistance(stub, toMerge, 0)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("could not set distance of {%s}: %v", toMerge, err))
     }
     newPlatA := platA.Members
     for _, user := range platB.Members {
@@ -530,9 +561,14 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", platBID, err))
     }
-    var payment int
+
+    var payment float64
+    timeSince := txTime - platB.LastMove
+    //convert seconds->hours, multiply by mph
+    distanceTraveled := float64(timeSince)/3600 * float64(platB.CurrSpeed)
+    distanceTraveled += platB.Distance
     if len(platB.Members) > 1 {
-        payment = int((txTime - leader.LastMove + int64(t.leaderBonus))/int64(len(platB.Members)-1))
+        payment = (distanceTraveled + t.leaderBonus)/float64(len(platB.Members)-1)
     }else {
         payment = 0
     }
@@ -950,7 +986,7 @@ func (t* SamTestChaincode) setUserPlat(stub shim.ChaincodeStubInterface, userID 
 
 //helper function, not a chaincode function
 //sets a specific user's reputation (does not commit)
-func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID string, rep int) error {
+func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID string, rep float64) error {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {
@@ -977,7 +1013,7 @@ func (t* SamTestChaincode) setUserRep(stub shim.ChaincodeStubInterface, userID s
 
 //helper function, not a chaincode function
 //adds an amount to a specific user's reputation (does not commit)
-func (t* SamTestChaincode) addUserRep(stub shim.ChaincodeStubInterface, userID string, rep int) error {
+func (t* SamTestChaincode) addUserRep(stub shim.ChaincodeStubInterface, userID string, rep float64) error {
     if len(t.pendingUserChanges) == 0 {
         userList, err := stub.GetState("users")
         if err != nil {

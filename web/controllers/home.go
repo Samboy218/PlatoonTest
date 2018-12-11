@@ -9,8 +9,8 @@ import (
 type platoonUser struct {
     ID          string
     CurrPlat    string
-    Reputation  int
-    Money       int
+    Reputation  float64
+    Money       float64
     LastMove    int64
 }
 type platoon struct {
