@@ -92,7 +92,7 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 		return fmt.Errorf("failed to create chaincode package: %v", err)
 	}
 
-    version := "2.56"
+    version := "2.63"
     //yay 2.0! it doesn't mean anything though
 	// Install our chaincode on org peers
 	// The resource management client send the chaincode to all peers in its channel in order for them to store it and interact with it later
@@ -105,7 +105,7 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 	// Set up chaincode policy
 	// The chaincode policy is required if your transactions must follow some specific rules
 	// If you don't provide any policy every transaction will be endorsed, and it's probably not what you want
-	// In this case, we set the rule to : Endorse the transaction if the transaction have been signed by a member from the org "org1.hf.chainhero.io"
+	// In this case, we set the rule to : Endorse the transaction if the transaction have been signed by a member from the org "org1.samtest.com"
 	ccPolicy := cauthdsl.SignedByAnyMember([]string{"org1.samtest.com"})
 
 	// Instantiate our chaincode on org peers

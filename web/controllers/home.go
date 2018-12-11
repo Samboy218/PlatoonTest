@@ -19,7 +19,7 @@ type platoon struct {
     //timestamp of last change
     LastMove int64
     //distance (in miles) since the leaer was last payed
-    Distance int
+    Distance float64
     Members []string
 }
 

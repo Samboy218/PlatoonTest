@@ -2,7 +2,7 @@ package main
 
 //
 //
-//TODO: fix split, add changeSpeed
+//TODO: add changeSpeed
 //
 //
 
@@ -15,6 +15,7 @@ import (
     "encoding/json"
     "crypto/x509"
     "encoding/pem"
+    "strconv"
 )
 
 
@@ -38,7 +39,7 @@ type platoon struct {
     //timestamp of last change
     LastMove int64
     //distance (in miles) since the leaer was last payed
-    Distance int
+    Distance float64
     Members []string
 }
 
@@ -142,6 +143,8 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
         resp = t.mergePlatoon(stub, args)
     }else if args[0] == "splitPlatoon" {
         resp = t.splitPlatoon(stub, args)
+    }else if args[0] == "changeSpeed" {
+        resp = t.changeSpeed(stub, args)
     }else {
         return shim.Error("Failed to invoke, check argument 1")
     }
@@ -577,6 +580,82 @@ func (t *SamTestChaincode) splitPlatoon(stub shim.ChaincodeStubInterface, args [
 
 }
 
+//This function allows a user to change the speed of a platoon
+//PRE: The user passes in the new speed of the platoon
+//POST: The user's platoon changes to the specified speed
+//      The transaction will fail if any of the following occur:
+//          the user is not in a platoon
+//          the user is not the leader of a platoon
+//          speed is less than 0
+func (t* SamTestChaincode) changeSpeed(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+    if len(args) < 1 {
+        return shim.Error("invalid number of arguments for changeSpeed, need at least 1")
+    }
+    if args[1] == "" {
+        return shim.Error(fmt.Sprintf("need value for new speed"))
+    }
+    //get the time
+    txTimestamp, err := stub.GetTxTimestamp()
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get time: %v", err))
+    }
+    txTime := txTimestamp.GetSeconds()
+
+    //get the user id
+    userID, err := getUfromCert(stub)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("Error getting userID: %v", err))
+    }
+    //try to get user
+    currUser, err := t.getUser(stub, userID)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err))
+    }
+    plat, err := t.getPlat(stub, currUser.CurrPlat)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("couldn't get user's platoon: %v", err))
+    }
+    if plat.ID != currUser.CurrPlat {
+        return shim.Error(fmt.Sprintf("could not get platoon"))
+    }
+    if plat.Members[0] != userID {
+        return shim.Error(fmt.Sprintf("user is not leader of platoon"))
+    }
+    speed, err := strconv.Atoi(args[1])
+    if err != nil {
+        return shim.Error(fmt.Sprintf("could not parse speed value: %v", err))
+    }
+    if speed < 0 {
+        return shim.Error(fmt.Sprintf("speed can not be negative"))
+    }
+    //
+    //TODO: find out distance traveled
+    //
+    timeSince := txTime - plat.LastMove
+    //convert seconds->hours, multiply by mph
+    distanceTraveled := float64(timeSince)/3600 * float64(plat.CurrSpeed)
+    err = t.changePlatDistance(stub, plat.ID, distanceTraveled)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error changing platoon distance traveled: %v", err))
+    }
+    err = t.setPlatSpeed(stub, plat.ID, speed)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error setting platoon speed: %v", err))
+    }
+    err = t.setPlatLastMove(stub, plat.ID, txTime)
+    if err != nil {
+        return shim.Error(fmt.Sprintf("error setting platoon last move: %v", err))
+    }
+
+    err = stub.SetEvent("eventInvoke", []byte{})
+    if err != nil {
+        return shim.Error(err.Error())
+    }
+
+    return shim.Success(nil) 
+
+}
+
 //helper function, not a chaincode function
 //creates a new user in the database if it isn't already there
 func (t* SamTestChaincode) newUser(stub shim.ChaincodeStubInterface, user platoonUser) error {
@@ -723,7 +802,7 @@ func (t* SamTestChaincode) setPlatLastMove(stub shim.ChaincodeStubInterface, pla
     return nil
 }
 
-func (t* SamTestChaincode) setPlatDistance(stub shim.ChaincodeStubInterface, platID string, distance int) error {
+func (t* SamTestChaincode) setPlatDistance(stub shim.ChaincodeStubInterface, platID string, distance float64) error {
     for i, currPlat := range t.pendingPlatChanges {
         if currPlat.ID == platID {
             //plat exists in pending changes
@@ -744,6 +823,31 @@ func (t* SamTestChaincode) setPlatDistance(stub shim.ChaincodeStubInterface, pla
         }
     }
     plat.Distance = distance
+    t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
+    return nil
+}
+
+func (t* SamTestChaincode) changePlatDistance(stub shim.ChaincodeStubInterface, platID string, distance float64) error {
+    for i, currPlat := range t.pendingPlatChanges {
+        if currPlat.ID == platID {
+            //plat exists in pending changes
+            t.pendingPlatChanges[i].Distance += distance
+            return nil
+        }
+    }
+
+    platData, err := stub.GetState(platID)
+    if err != nil {
+        return fmt.Errorf("unable to get platoon {%s}: %v", platID, err)
+    }
+    var plat platoon
+    if string(platData) != "" {
+        err = json.Unmarshal(platData, &plat)
+        if err != nil {
+            return fmt.Errorf("error decoding JSON data: %v", err)
+        }
+    }
+    plat.Distance += distance
     t.pendingPlatChanges = append(t.pendingPlatChanges, plat)
     return nil
 }
