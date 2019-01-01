@@ -12,6 +12,7 @@ type platoonUser struct {
     Reputation  float64
     Money       float64
     LastMove    int64
+    EfficiencyClass string
 }
 type platoon struct {
     ID string
