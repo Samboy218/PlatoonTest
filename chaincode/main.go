@@ -54,25 +54,28 @@ func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
     fmt.Println("##### SamTestChaincode Init #####")
 
     function, _ := stub.GetFunctionAndParameters()
+    /*
     TxTimestamp, err := stub.GetTxTimestamp()
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get Timestamp: %v", err))
     }
     TxTime := TxTimestamp.GetSeconds()
+    */
 
     if function != "init" {
         return shim.Error("Unknown function call")
     }
 
-    //make the dummy platoons and users
+    //make the users
     var fakeUsers []platoonUser
     classes := make([]string, 3)
     classes[0] = "efficient"
     classes[1] = "default"
     classes[2] = "inefficient"
-    for i := 2; i < 16; i++ {
-        fakeUsers = append(fakeUsers, platoonUser{ID:fmt.Sprintf("User%d@org1.samtest.com", i), LastMove:TxTime, EfficiencyClass:classes[i%3]})
+    for i := 1; i < 16; i++ {
+        fakeUsers = append(fakeUsers, platoonUser{ID:fmt.Sprintf("User%d@org1.samtest.com", i), EfficiencyClass:classes[i%3]})
     }
+    /*
     fakePlats := make(map[string][]string)
     for i, user := range fakeUsers[0:5] {
         fakePlats["plat1"] = append(fakePlats["plat1"], user.ID)
@@ -112,7 +115,8 @@ func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
     if err != nil {
         return shim.Error(fmt.Sprintf("Unable to update platoon list: %v", err))
     }
-    state, err = json.Marshal(fakeUsers)
+    */
+    state, err := json.Marshal(fakeUsers)
     if err != nil {
         return shim.Error(fmt.Sprintf("error encoding JSON: %v", err))
     }
@@ -252,31 +256,33 @@ func (t *SamTestChaincode) joinPlatoon(args []string) pb.Response {
     }
 
     //calculate what we need to pay the driver
-    leader, err := t.getUser(plat.Members[0])
-    if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
-    }
-    timeSince := txTime - plat.LastMove
-    //convert seconds->hours, multiply by mph
-    distanceTraveled := float64(timeSince)/3600 * float64(plat.CurrSpeed)
-    distanceTraveled += plat.Distance
-    payments, err := t.calcPayment(plat.Members, distanceTraveled)
-    if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't calculate payment: %v", err))
-    }
-    for i, test := range plat.Members{
-        if test == userID {
-            return shim.Error("value already in platoon")
+    if len(plat.Members) != 0 {
+        leader, err := t.getUser(plat.Members[0])
+        if err != nil {
+            return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
         }
-        if test != leader.ID {
-            //pay the driver, update timestamp
-            err = t.addUserRep(leader.ID, payments[i])
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+        timeSince := txTime - plat.LastMove
+        //convert seconds->hours, multiply by mph
+        distanceTraveled := float64(timeSince)/3600 * float64(plat.CurrSpeed)
+        distanceTraveled += plat.Distance
+        payments, err := t.calcPayment(plat.Members, distanceTraveled)
+        if err != nil {
+            return shim.Error(fmt.Sprintf("couldn't calculate payment: %v", err))
+        }
+        for i, test := range plat.Members{
+            if test == userID {
+                return shim.Error("value already in platoon")
             }
-            err = t.addUserRep(test, -1*payments[i])
-            if err != nil {
-                return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+            if test != leader.ID {
+                //pay the driver, update timestamp
+                err = t.addUserRep(leader.ID, payments[i])
+                if err != nil {
+                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+                }
+                err = t.addUserRep(test, -1*payments[i])
+                if err != nil {
+                    return shim.Error(fmt.Sprintf("couldn't pay leader: %v", err))
+                }
             }
         }
     }
@@ -298,15 +304,11 @@ func (t *SamTestChaincode) joinPlatoon(args []string) pb.Response {
 //POST: The use will no longer be a part of a platoon
 //      the transaction will fail if any of the following will occur:
 //          the user is not in a platoon
-//          the user is not in the specified platoon
 func (t *SamTestChaincode) leavePlatoon(args []string) pb.Response {
-    if len(args) < 2 {
-        return shim.Error("invalid number of arguments for lavePlatoon, need at least 2")
+    if len(args) < 1 {
+        return shim.Error("invalid number of arguments for lavePlatoon, need at least 1")
     }
-    if args[1] == "users" || args[1] == "platoons" {
-        return shim.Error(fmt.Sprintf("{%s} is a reserved name", args[1]))
-    }
-
+    //user does not need to specify what platoon they're leaving
     txTimestamp, err := t.stub.GetTxTimestamp()
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get timestamp: %v", err))
@@ -322,22 +324,23 @@ func (t *SamTestChaincode) leavePlatoon(args []string) pb.Response {
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err))
     }
-    if currUser.CurrPlat != args[1] {
-        return shim.Error(fmt.Sprintf("user {%s} cant leave platoon {%s}: not in platoon", userID, args[1]))
+    currPlatID := currUser.CurrPlat
+    if currPlatID == "" {
+        return shim.Error(fmt.Sprintf("Could not leave platoon: user %s not in platoon", userID))
     }
     err = t.setUserPlat(userID, "")
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't set user {%s} to leave platoon {%s}: %v", userID, args[1], err))
+        return shim.Error(fmt.Sprintf("couldn't set user {%s} to leave platoon {%s}: %v", userID, currPlatID, err))
     }
-    plat, err := t.getPlat(args[1])
+    plat, err := t.getPlat(currPlatID)
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", args[1], err))
+        return shim.Error(fmt.Sprintf("couldn't get platoon {%s}: %v", currPlatID, err))
     }
 
     //also pay the driver
     leader, err := t.getUser(plat.Members[0])
     if err != nil {
-        return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", args[1], err))
+        return shim.Error(fmt.Sprintf("couldn't get leader of %s: %v", currPlatID, err))
     }
 
     timeSince := txTime - plat.LastMove
@@ -370,8 +373,8 @@ func (t *SamTestChaincode) leavePlatoon(args []string) pb.Response {
         return shim.Error(fmt.Sprintf("Value {%s} not in platoon, cannot leave", userID))
     }
     newMembers := append(plat.Members[:toLeave], plat.Members[toLeave+1:]...)
-    t.setPlatMembers(args[1], newMembers)
-    t.setPlatLastMove(args[1], txTime)
+    t.setPlatMembers(currPlatID, newMembers)
+    t.setPlatLastMove(currPlatID, txTime)
 
     err = t.stub.SetEvent("eventInvoke", []byte{})
     if err != nil {

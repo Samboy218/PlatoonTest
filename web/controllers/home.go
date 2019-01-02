@@ -47,29 +47,31 @@ func (app *Application) HomeHandler(w http.ResponseWriter, r *http.Request) {
         }
 
         if platID == "platoons" {
-            var platoonIDs []string
-            err = json.Unmarshal([]byte(payload), &platoonIDs)
-            if err != nil {
-                http.Error(w, fmt.Sprintf("unable to decode JSON response: %v", err), 500)
-                return
-            }
             var platoons []platoon
-            var tempPlat platoon
-            for _, id := range platoonIDs {
-                payload, err = app.Fabric.QueryVal(id)
+            var platoonIDs []string
+            if payload != "" {
+                err = json.Unmarshal([]byte(payload), &platoonIDs)
                 if err != nil {
-                    http.Error(w, fmt.Sprintf("unable to get platoon {%s}: %v", id, err), 500)
+                    http.Error(w, fmt.Sprintf("unable to decode JSON response: %v", err), 500)
                     return
                 }
-                if payload != "" {
-                    err = json.Unmarshal([]byte(payload), &tempPlat)
+                var tempPlat platoon
+                for _, id := range platoonIDs {
+                    payload, err = app.Fabric.QueryVal(id)
                     if err != nil {
-                        http.Error(w, fmt.Sprintf("unable to decode JSON: %v\n%s", err, payload), 500)
+                        http.Error(w, fmt.Sprintf("unable to get platoon {%s}: %v", id, err), 500)
                         return
                     }
+                    if payload != "" {
+                        err = json.Unmarshal([]byte(payload), &tempPlat)
+                        if err != nil {
+                            http.Error(w, fmt.Sprintf("unable to decode JSON: %v\n%s", err, payload), 500)
+                            return
+                        }
+                    }
+                    platoons = append(platoons, tempPlat)
+                    tempPlat = platoon{}
                 }
-                platoons = append(platoons, tempPlat)
-                tempPlat = platoon{}
             }
             dataPlat := &struct {
                 QueryRet []platoon

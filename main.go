@@ -45,13 +45,34 @@ func main() {
             fmt.Printf("Unable to create new user {User%s}: %v\n", i, err)
             return
         }
-        app := &controllers.Application {
-            Fabric: &cSetup,
-        }
         cSetups = append(cSetups, cSetup)
+    }
+
+    //make a way to quickly run through test cases
+    moves := make([][]string, 0)
+    //moves[0] = []string{"user", "function", "args"}
+    moves = append(moves, []string{"1", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"1", "leavePlatoon", "", ""})
+    
+    for _, move := range moves {
+        var ind int
+        fmt.Sscan(move[0], &ind)
+        ID, err := cSetups[ind].Invoke(move[1], move[2], move[3])
+        if err != nil {
+            fmt.Printf("Failed to execute move {%v}: %v", move, err)
+            return
+        }
+        fmt.Printf("Successful transaction, ID: %s", ID)
+    }
+
+    for i, curr := range cSetups {
+        app := &controllers.Application {
+            Fabric: &curr,
+        }
         web.Serve(app, 8000+i)
         apps = append(apps, app)
     }
     fmt.Scanf("%s")
+
 }
 
