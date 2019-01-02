@@ -2,7 +2,7 @@ package main
 
 //
 //
-//TODO: implement better payment algo, max length check, max debt check (merge as well) 
+//TODO: max length check, max debt check (merge as well) 
 //
 //
 
@@ -688,9 +688,6 @@ func (t* SamTestChaincode) changeSpeed(args []string) pb.Response {
     if speed < 0 {
         return shim.Error(fmt.Sprintf("speed can not be negative"))
     }
-    //
-    //TODO: find out distance traveled
-    //
     timeSince := txTime - plat.LastMove
     //convert seconds->hours, multiply by mph
     distanceTraveled := float64(timeSince)/3600 * float64(plat.CurrSpeed)
@@ -1123,6 +1120,7 @@ func (t *SamTestChaincode) commitChanges() error {
 //takes in a list of platoon members, and a distance traveled, and returns an array of payments to be made to the leader
 func (t *SamTestChaincode) calcPayment(plat []string, distance float64) ([]float64, error) {
     //get all of the users from the platoon
+    fmt.Println(fmt.Sprintf("Distance Traveled: %f miles", distance))
     var users []platoonUser
     var fuelUsedNormal []float64
     var fuelUsedPlatoon []float64
