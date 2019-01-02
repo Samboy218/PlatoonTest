@@ -51,8 +51,22 @@ func main() {
     //make a way to quickly run through test cases
     moves := make([][]string, 0)
     //moves[0] = []string{"user", "function", "args"}
+    moves = append(moves, []string{"0", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"1", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"1", "leavePlatoon", "", ""})
+    moves = append(moves, []string{"2", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"3", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"4", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"5", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"10", "joinPlatoon", "plat2", ""})
+    moves = append(moves, []string{"11", "joinPlatoon", "plat2", ""})
+    moves = append(moves, []string{"12", "joinPlatoon", "plat2", ""})
+    moves = append(moves, []string{"3", "leavePlatoon", "", ""})
+    moves = append(moves, []string{"5", "leavePlatoon", "", ""})
+    moves = append(moves, []string{"10", "mergePlatoon", "plat1", ""})
+    moves = append(moves, []string{"3", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"11", "splitPlatoon", "plat3", ""})
+    moves = append(moves, []string{"1", "leavePlatoon", "plat1", ""})
+    moves = append(moves, []string{"1", "joinPlatoon", "plat3", ""})
     
     for _, move := range moves {
         var ind int
