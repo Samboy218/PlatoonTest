@@ -1179,7 +1179,7 @@ func (t *SamTestChaincode) calcPayment(plat []string, distance float64) ([]float
         if i == 0 {
             moneyPaid = append(moneyPaid, 0)
         }
-        moneyPaid = append(moneyPaid, (curr/averageFollowerSavings) * avgPayment) //[11]
+        moneyPaid = append(moneyPaid, ((curr/averageFollowerSavings) * avgPayment) * (1+t.leaderBonus)) //[11]
     }
     return moneyPaid, nil
 }
