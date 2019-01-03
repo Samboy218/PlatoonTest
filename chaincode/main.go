@@ -773,7 +773,8 @@ func (t* SamTestChaincode) newPlat(platID string) error {
     }
     var plat platoon
     plat.ID = platID
-    plat.CurrSpeed = 60
+    //default spped multiplied by 100 in order to speed testing up
+    plat.CurrSpeed = 6000
     txTimestamp, err := t.stub.GetTxTimestamp()
     if err != nil {
         return fmt.Errorf("couldn't get time: %v", err)
@@ -1137,21 +1138,24 @@ func (t *SamTestChaincode) calcPayment(plat []string, distance float64) ([]float
         }
         users = append(users, temp)
         //for each user, calc normal fuel usage and platoon fuel usage
-        tempFuel := distance * t.FuelTable[temp.EfficiencyClass]
+        tempFuel := distance / t.FuelTable[temp.EfficiencyClass]
         fuelUsedNormal = append(fuelUsedNormal, tempFuel) //[1]
         //efficiencyMatrix is a nested map which can tell a car's efficiency based on what type of car is in front of it
         //for example, a value of .90 in t.efficiencyMatrix["default"]["efficient"] means that when a "efficient" class
         //  vehicle is in front of a "default" class vehicle, the "default" vehicle uses .90 of the fuel it normally would
         if i == 0 {
-            tempFuel = distance * (t.FuelTable[temp.EfficiencyClass] * t.efficiencyMatrix[temp.EfficiencyClass]["leader"])
+            tempFuel = distance / (t.FuelTable[temp.EfficiencyClass] * (1 + (1-t.efficiencyMatrix[temp.EfficiencyClass]["leader"])))
         } else {
-            tempFuel = distance * (t.FuelTable[temp.EfficiencyClass] * t.efficiencyMatrix[temp.EfficiencyClass][users[i-1].EfficiencyClass])
+            tempFuel = distance / (t.FuelTable[temp.EfficiencyClass] * (1 + (1-t.efficiencyMatrix[temp.EfficiencyClass][users[i-1].EfficiencyClass])))
         }
         fuelUsedPlatoon = append(fuelUsedPlatoon, tempFuel) //[2]
         fuelSaved = append(fuelSaved, fuelUsedNormal[i] - fuelUsedPlatoon[i])
         moneySaved = append(moneySaved, (fuelUsedNormal[i] - fuelUsedPlatoon[i]) * t.FuelPrice)
         pctChangeConsumption = append(pctChangeConsumption, 100 - (fuelUsedPlatoon[i]/fuelUsedNormal[i] * 100)) //[3]
     }
+    fmt.Println(fmt.Sprintf("fuelSaved: %v", fuelSaved))
+    fmt.Println(fmt.Sprintf("moneySaved: %v", moneySaved))
+    fmt.Println(fmt.Sprintf("pctChangeConsumption: %v", pctChangeConsumption))
     //now get average pct change of non-leader members
     var averagePct float64
     for i, curr := range pctChangeConsumption {
@@ -1161,9 +1165,13 @@ func (t *SamTestChaincode) calcPayment(plat []string, distance float64) ([]float
         averagePct += curr
     }
     averagePct = averagePct/float64(len(users)-1) //[4]
+    fmt.Println(fmt.Sprintf("averagePct: %f", averagePct))
     shouldHaveSaved := fuelUsedNormal[0] - (averagePct*fuelUsedNormal[0]/100) //[5]
+    fmt.Println(fmt.Sprintf("shouldHaveSaved: %f", shouldHaveSaved))
     fuelCompensation := fuelUsedPlatoon[0] - shouldHaveSaved //[6]
+    fmt.Println(fmt.Sprintf("fuelCompensation: %f", fuelCompensation))
     moneyReceived := fuelCompensation * t.FuelPrice //[7]
+    fmt.Println(fmt.Sprintf("moneyReceived: %f", moneyReceived))
     //moneySaved := fuelSaved[0] * t.FuelPrice //[8]
     var averageFollowerSavings float64
     for i, curr := range moneySaved {

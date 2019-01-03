@@ -1,6 +1,7 @@
 package main
 
 import (
+    "time"
     "fmt"
     "PlatoonTest/blockchain"
     "PlatoonTest/web"
@@ -50,33 +51,38 @@ func main() {
 
     //make a way to quickly run through test cases
     moves := make([][]string, 0)
-    //moves[0] = []string{"user", "function", "args"}
-    moves = append(moves, []string{"0", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"1", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"2", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"3", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"4", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"5", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"10", "joinPlatoon", "plat2", ""})
-    moves = append(moves, []string{"11", "joinPlatoon", "plat2", ""})
-    moves = append(moves, []string{"12", "joinPlatoon", "plat2", ""})
-    moves = append(moves, []string{"3", "leavePlatoon", "", ""})
-    moves = append(moves, []string{"5", "leavePlatoon", "", ""})
-    moves = append(moves, []string{"10", "mergePlatoon", "plat1", ""})
-    moves = append(moves, []string{"3", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"11", "splitPlatoon", "plat3", ""})
-    moves = append(moves, []string{"1", "leavePlatoon", "plat1", ""})
-    moves = append(moves, []string{"1", "joinPlatoon", "plat3", ""})
+    //moves[0] = []string{"delay", "user", "function", "args"}
+    moves = append(moves, []string{"0", "0", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "1", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "2", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "3", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "4", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "5", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"10", "10", "joinPlatoon", "plat2", ""})
+    moves = append(moves, []string{"0", "11", "joinPlatoon", "plat2", ""})
+    moves = append(moves, []string{"0", "12", "joinPlatoon", "plat2", ""})
+    moves = append(moves, []string{"5", "3", "leavePlatoon", "", ""})
+    moves = append(moves, []string{"7", "5", "leavePlatoon", "", ""})
+    moves = append(moves, []string{"15", "10", "mergePlatoon", "plat1", ""})
+    moves = append(moves, []string{"3", "3", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"10", "11", "splitPlatoon", "plat3", ""})
+    moves = append(moves, []string{"5", "1", "leavePlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "1", "joinPlatoon", "plat3", ""})
     
     for _, move := range moves {
         var ind int
-        fmt.Sscan(move[0], &ind)
-        ID, err := cSetups[ind].Invoke(move[1], move[2], move[3])
+        var delay int
+        fmt.Sscan(move[0], &delay)
+        fmt.Sscan(move[1], &ind)
+        fmt.Printf("Sleeping %d before doing move {%v}\n", delay, move)
+        time.Sleep(time.Duration(delay) * time.Second)
+        fmt.Printf("doing move {%v}\n", move)
+        ID, err := cSetups[ind].Invoke(move[2], move[3], move[4])
         if err != nil {
-            fmt.Printf("Failed to execute move {%v}: %v", move, err)
+            fmt.Printf("Failed to execute move {%v}: %v\n", move, err)
             return
         }
-        fmt.Printf("Successful transaction, ID: %s", ID)
+        fmt.Printf("Successful transaction, ID: %s\n", ID)
     }
 
     for i, curr := range cSetups {
