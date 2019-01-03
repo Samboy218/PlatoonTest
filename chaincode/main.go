@@ -142,7 +142,7 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     }
     //leader gets a percent based bonus per transaction
     t.stub = stub
-    t.leaderBonus = .00
+    t.leaderBonus = 2
     t.FuelPrice = 1.98
     //MPG
     t.FuelTable = make(map[string]float64)
@@ -1165,6 +1165,7 @@ func (t *SamTestChaincode) calcPayment(plat []string, distance float64) ([]float
         averagePct += curr
     }
     averagePct = averagePct/float64(len(users)-1) //[4]
+    averagePct += t.leaderBonus //add leader bonus
     fmt.Println(fmt.Sprintf("averagePct: %f", averagePct))
     shouldHaveSaved := fuelUsedNormal[0] - (averagePct*fuelUsedNormal[0]/100) //[5]
     fmt.Println(fmt.Sprintf("shouldHaveSaved: %f", shouldHaveSaved))
@@ -1187,7 +1188,7 @@ func (t *SamTestChaincode) calcPayment(plat []string, distance float64) ([]float
         if i == 0 {
             moneyPaid = append(moneyPaid, 0)
         }
-        moneyPaid = append(moneyPaid, ((curr/averageFollowerSavings) * avgPayment) * (1+t.leaderBonus)) //[11]
+        moneyPaid = append(moneyPaid, ((curr/averageFollowerSavings) * avgPayment)) //[11]
     }
     return moneyPaid, nil
 }
