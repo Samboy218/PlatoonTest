@@ -6,8 +6,32 @@ import (
     "PlatoonTest/blockchain"
     "PlatoonTest/web"
     "PlatoonTest/web/controllers"
+    "encoding/json"
     "os"
 )
+
+type platoonUser struct {
+    ID          string
+    CurrPlat    string
+    Reputation  float64
+    Money       float64
+    LastMove    int64
+    EfficiencyClass string
+}
+type platoon struct {
+    ID string
+    CurrSpeed int
+    //timestamp of last change
+    LastMove int64
+    //distance (in miles) since the leaer was last payed
+    Distance float64
+    Members []string
+}
+type dbState struct {
+    ActionPerformed string
+    Users []platoonUser
+    Platoons []platoon
+}
 
 func main() {
     fSetup := blockchain.FabricSetup{
@@ -68,12 +92,14 @@ func main() {
     moves = append(moves, []string{"10", "11", "splitPlatoon", "plat3", ""})
     moves = append(moves, []string{"5", "1", "leavePlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "1", "joinPlatoon", "plat3", ""})
-    
+    var runs []dbState
     for _, move := range moves {
+        var tempRun dbState
         var ind int
         var delay int
         fmt.Sscan(move[0], &delay)
         fmt.Sscan(move[1], &ind)
+        tempRun.ActionPerformed = fmt.Sprintf("%s did %s on %s after %s seconds", cSetups[ind].UserName, move[2], move[3], move[0])
         fmt.Printf("Sleeping %d before doing move {%v}\n", delay, move)
         time.Sleep(time.Duration(delay) * time.Second)
         fmt.Printf("doing move {%v}\n", move)
@@ -83,7 +109,66 @@ func main() {
             return
         }
         fmt.Printf("Successful transaction, ID: %s\n", ID)
+        //get all of the data and put it into a file
+        payload, err := cSetups[ind].QueryVal("users")
+        if err != nil {
+            fmt.Printf("Couldn't query users: %v\n", err)
+            return
+        }
+        if payload != "" {
+            err = json.Unmarshal([]byte(payload), &tempRun.Users)
+            if err != nil {
+                fmt.Printf("unable to decode JSON response: %v\n", err)
+                return
+            }
+        }
+        payload, err = cSetups[ind].QueryVal("platoons")
+        if err != nil {
+            fmt.Printf("Couldn't query platoons: %v\n", err)
+            return
+        }
+        var platoonIDs []string
+        if payload != "" {
+            err = json.Unmarshal([]byte(payload), &platoonIDs)
+            if err != nil {
+                fmt.Printf("unable to decode JSON response: %v\n", err)
+                return
+            }
+        }
+        for _, curr := range platoonIDs {
+            var temp platoon
+            payload, err = cSetups[ind].QueryVal(curr)
+            if err != nil {
+                fmt.Printf("couldn't query %s: %v\n", curr, err)
+            }
+            if payload != "" {
+                err = json.Unmarshal([]byte(payload), &temp)
+                if err != nil {
+                    fmt.Printf("unable to decode JSON response: %v\n", err)
+                    return
+                }
+                tempRun.Platoons = append(tempRun.Platoons, temp)
+            }
+        }
+        runs = append(runs, tempRun)
     }
+
+    dump, err := json.Marshal(runs)
+    if err != nil {
+        fmt.Printf("Couldn't encode JSON: %v\n", err)
+    }
+
+    f, err := os.Create("run.json")
+    if err != nil {
+        fmt.Printf("Couldn't open file: %v\n", err)
+    }
+    defer f.Close()
+    numBytes, err := f.WriteString(string(dump))
+    if err != nil {
+        fmt.Printf("Couldn't write to file: %v\n", err)
+    }
+    fmt.Printf("Wrote %d bytes\n", numBytes)
+    f.Sync()
 
     for i, curr := range cSetups {
         app := &controllers.Application {
