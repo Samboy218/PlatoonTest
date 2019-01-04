@@ -140,8 +140,8 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     if len(args) < 1 {
         return shim.Error("invalid arguments, expected at least 1")
     }
-    //leader gets a percent based bonus per transaction
     t.stub = stub
+    //leader gets a percent based bonus per transaction
     t.leaderBonus = 2
     t.FuelPrice = 1.98
     //MPG
@@ -419,6 +419,9 @@ func (t *SamTestChaincode) mergePlatoon(args []string) pb.Response {
     //platB is caller.CurPlat
     //end result of this function is platA = [platA+platB]; platB = []
     toMerge := currUser.CurrPlat
+    if toMerge == "" {
+        return shim.Error(fmt.Sprintf("User {%s} not in any platoon"))
+    }
     platB, err := t.getPlat(toMerge)
 
     //check if the user is the leader of tomerge
@@ -673,6 +676,9 @@ func (t* SamTestChaincode) changeSpeed(args []string) pb.Response {
     currUser, err := t.getUser(userID)
     if err != nil {
         return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err))
+    }
+    if currUser.CurrPlat == "" {
+        return shim.Error(fmt.Sprintf("Couldn't change speed: user %s not in platoon", currUser.ID))
     }
     plat, err := t.getPlat(currUser.CurrPlat)
     if err != nil {
