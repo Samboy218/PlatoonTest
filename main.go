@@ -80,19 +80,44 @@ func main() {
     moves = append(moves, []string{"0", "1", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "2", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "3", "joinPlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "3", "joinPlatoon", "plat5", ""}) //invalid
+    moves = append(moves, []string{"0", "3", "splitPlatoon", "", ""}) //invalid
+    moves = append(moves, []string{"0", "3", "mergePlatoon", "plat5", ""}) //invalid
     moves = append(moves, []string{"0", "4", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "5", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"10", "10", "joinPlatoon", "plat2", ""})
     moves = append(moves, []string{"0", "11", "joinPlatoon", "plat2", ""})
     moves = append(moves, []string{"0", "12", "joinPlatoon", "plat2", ""})
     moves = append(moves, []string{"5", "3", "leavePlatoon", "", ""})
+    moves = append(moves, []string{"0", "3", "mergePlatoon", "plat1", ""}) //invalid
+    moves = append(moves, []string{"0", "3", "changeSpeed", "0", ""}) //invalid
+    moves = append(moves, []string{"0", "3", "splitPlatoon", "plat5", ""}) //invalid
     moves = append(moves, []string{"7", "5", "leavePlatoon", "", ""})
     moves = append(moves, []string{"15", "10", "mergePlatoon", "plat1", ""})
     moves = append(moves, []string{"3", "3", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"10", "11", "splitPlatoon", "plat3", ""})
     moves = append(moves, []string{"5", "1", "leavePlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "1", "joinPlatoon", "plat3", ""})
+
+    /*Example of some invalid transactions
+    //cannot join a platoon if you are already in one
+    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat1", ""}) //valid
+    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat2", ""}) //invalid
+    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat3", ""}) //invalid
+    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat4", ""}) //invalid
+    //cannot merge unless you are leader
+    moves = append(moves, []string{"0", "6", "mergePlatoon", "plat3", ""}) //invalid
+    //cannot merge into self
+    moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
+    moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //valid
+    //cannot leave/split/merge if you aren't in a platoon
+    moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //invalid
+    moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
+    moves = append(moves, []string{"0", "6", "splitPlatoon", "plat1", ""}) //invalid
+    */
+
     var runs []dbState
+    startTime := time.Now()
     for _, move := range moves {
         var tempRun dbState
         var ind int
@@ -106,9 +131,10 @@ func main() {
         ID, err := cSetups[ind].Invoke(move[2], move[3], move[4])
         if err != nil {
             fmt.Printf("Failed to execute move {%v}: %v\n", move, err)
-            return
+            tempRun.ActionPerformed = fmt.Sprintf("%s: FAILED", tempRun.ActionPerformed)
+        }else {
+            fmt.Printf("Successful transaction, ID: %s\n", ID)
         }
-        fmt.Printf("Successful transaction, ID: %s\n", ID)
         //get all of the data and put it into a file
         payload, err := cSetups[ind].QueryVal("users")
         if err != nil {
@@ -152,6 +178,9 @@ func main() {
         }
         runs = append(runs, tempRun)
     }
+    endTime := time.Now()
+    elapsed := endTime.Sub(startTime)
+    fmt.Printf("Run took %f seconds\n", elapsed.Seconds())
 
     dump, err := json.Marshal(runs)
     if err != nil {
