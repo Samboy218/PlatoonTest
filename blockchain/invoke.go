@@ -63,6 +63,7 @@ func (setup *ClientSetup) Invoke(function string, key string, value string) (str
 
     response, err := setup.client.Execute(chclient.Request{ChaincodeID: setup.ChainCodeID, Fcn: args[0], Args: [][]byte{[]byte(args[1]), []byte(args[2]), []byte(args[3])}, TransientMap: transientDataMap})
     if err != nil {
+        setup.client.UnregisterChaincodeEvent(rce)
         return "", fmt.Errorf("Failed to move funds: %v", err)
     }
 
