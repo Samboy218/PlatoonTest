@@ -1,12 +1,12 @@
 package main
 
 import (
-    "time"
+//    "time"
     "fmt"
     "PlatoonTest/blockchain"
     "PlatoonTest/web"
     "PlatoonTest/web/controllers"
-    "encoding/json"
+//    "encoding/json"
     "os"
 )
 
@@ -63,7 +63,7 @@ func main() {
 
 
     var cSetups []blockchain.ClientSetup
-    var apps []*controllers.Application
+    //var apps []*controllers.Application
     for i := 1; i < 16; i++ {
         cSetup, err := fSetup.InitializeUser(fmt.Sprintf("User%d", i))
         if err != nil {
@@ -72,6 +72,8 @@ func main() {
         }
         cSetups = append(cSetups, cSetup)
     }
+
+    /*
 
     //make a way to quickly run through test cases
     moves := make([][]string, 0)
@@ -98,23 +100,23 @@ func main() {
     moves = append(moves, []string{"10", "11", "splitPlatoon", "plat3", ""})
     moves = append(moves, []string{"5", "1", "leavePlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "1", "joinPlatoon", "plat3", ""})
+    moves = make([][]string, 0)
 
-    /*Example of some invalid transactions
+    //Example of some invalid transactions
     //cannot join a platoon if you are already in one
-    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat1", ""}) //valid
-    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat2", ""}) //invalid
-    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat3", ""}) //invalid
-    moves = append(moves, []string{"0", "6", "joinPlatoon", "plat4", ""}) //invalid
+    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat1", ""}) //valid
+    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat2", ""}) //invalid
+    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat3", ""}) //invalid
+    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat4", ""}) //invalid
     //cannot merge unless you are leader
-    moves = append(moves, []string{"0", "6", "mergePlatoon", "plat3", ""}) //invalid
+    //moves = append(moves, []string{"0", "6", "mergePlatoon", "plat3", ""}) //invalid
     //cannot merge into self
-    moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
-    moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //valid
+    //moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
+    //moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //valid
     //cannot leave/split/merge if you aren't in a platoon
-    moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //invalid
-    moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
-    moves = append(moves, []string{"0", "6", "splitPlatoon", "plat1", ""}) //invalid
-    */
+    //moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //invalid
+    //moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
+    //moves = append(moves, []string{"0", "6", "splitPlatoon", "plat1", ""}) //invalid
 
     var runs []dbState
     startTime := time.Now()
@@ -198,14 +200,17 @@ func main() {
     }
     fmt.Printf("Wrote %d bytes\n", numBytes)
     f.Sync()
-
+    */
     for i, curr := range cSetups {
-        app := &controllers.Application {
-            Fabric: &curr,
+        app := controllers.Application {
+            Fabric: curr,
         }
         web.Serve(app, 8000+i)
-        apps = append(apps, app)
+        //apps = append(apps, app)
     }
+    //for _, curr := range apps {
+    //    fmt.Printf("User: %s\n", curr.Fabric.UserName)
+    //}
     fmt.Scanf("%s")
 
 }
