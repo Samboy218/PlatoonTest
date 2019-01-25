@@ -16,19 +16,52 @@
 
 <form class="form-inline" action="mainApp.html" method="post">
     <div class="form-group">
-        <select name="func">
+        <select id="form-dropdown" name="func">
             <option value="joinPlatoon">Join</option>
             <option value="leavePlatoon">leave</option>
             <option value="mergePlatoon">merge</option>
             <option value="splitPlatoon">split</option>
             <option value="changeSpeed">change speed</option>
         </select>
-        <label for="platID">Platoon ID</label>
+        <label id="form-label" for="platID">Platoon ID</label>
         <input type="text" class="form-control" name="platID" id="platID">
     </div>
     <input type="hidden" name="submitted" value="true">
     <button type="submit" class="btn btn-default">Send it</button>
+    <p id="form-help">
+        Join an existing platoon at the rear, or create a new platoon
+    <p>
 </form>
+<script>
+    document.getElementById("form-dropdown").addEventListener('change', function() {
+        var value = this.value;
+        if (value == "joinPlatoon") {
+            document.getElementById("form-label").innerHTML = "Platoon ID";
+            document.getElementById("form-help").innerHTML = "Join an existing platoon at the rear, or create a new platoon";
+            document.getElementById("form-label").style.display = "inline-block";
+            document.getElementById("platID").style.display = "inline-block";
+        }else if (value == "leavePlatoon") {
+            document.getElementById("form-help").innerHTML = "Leave whatever platoon you are currently in";
+            document.getElementById("form-label").style.display = "none";
+            document.getElementById("platID").style.display = "none";
+        }else if (value == "mergePlatoon") { 
+            document.getElementById("form-label").innerHTML = "Platoon ID to merge with";
+            document.getElementById("form-help").innerHTML = "Cause your current platoon to join another platoon (Only leaders may use this function)";
+            document.getElementById("form-label").style.display = "inline-block";
+            document.getElementById("platID").style.display = "inline-block";
+        }else if (value == "splitPlatoon") { 
+            document.getElementById("form-label").innerHTML = "New Platoon ID";
+            document.getElementById("form-help").innerHTML = "Split the current platoon, taking every one that is currently behind you with you to the new platoon";
+            document.getElementById("form-label").style.display = "inline-block";
+            document.getElementById("platID").style.display = "inline-block";
+        }else if (value == "changeSpeed") { 
+            document.getElementById("form-label").innerHTML = "New Speed";
+            document.getElementById("form-help").innerHTML = "change the speed of your current platoon (only leaders may use this function)";
+            document.getElementById("form-label").style.display = "inline-block";
+            document.getElementById("platID").style.display = "inline-block";
+        }
+    });
+</script>
 
 {{ if .Response }}
 {{ if .Success }}
