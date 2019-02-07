@@ -142,7 +142,7 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     }
     t.stub = stub
     //leader gets a percent based bonus per transaction
-    t.leaderBonus = 0
+    t.leaderBonus = 2
     t.FuelPrice = 1.98
     //MPG
     t.FuelTable = make(map[string]float64)

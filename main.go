@@ -1,12 +1,12 @@
 package main
 
 import (
-//    "time"
+    "time"
     "fmt"
     "PlatoonTest/blockchain"
     "PlatoonTest/web"
     "PlatoonTest/web/controllers"
-//    "encoding/json"
+    "encoding/json"
     "os"
 )
 
@@ -32,6 +32,7 @@ type dbState struct {
     Users []platoonUser
     Platoons []platoon
 }
+
 
 func main() {
     fSetup := blockchain.FabricSetup{
@@ -60,7 +61,20 @@ func main() {
         fmt.Printf("Unable to install and instantiate the chaincode: %v\n", err)
         return
     }
+    /*
+    var funcs []blockchain.FuncDef
+    funcs = append(funcs, blockchain.FuncDef{Function:"joinPlatoon", Arg1:"Plat1", Arg2:""})
+    funcs = append(funcs, blockchain.FuncDef{Function:"splitPlatoon", Arg1:"Plat2", Arg2:""})
+    funcs = append(funcs, blockchain.FuncDef{Function:"changeSpeed", Arg1:"60", Arg2:""})
+    funcs = append(funcs, blockchain.FuncDef{Function:"leavePlatoon", Arg1:"", Arg2:""})
 
+    ret, err := fSetup.LoadTest(funcs, 100)
+    if err != nil {
+        fmt.Printf("bad stuff: %v\n", err)
+        return
+    }
+    fmt.Printf("%s\n", ret)
+    */
 
     var cSetups []blockchain.ClientSetup
     //var apps []*controllers.Application
@@ -73,7 +87,6 @@ func main() {
         cSetups = append(cSetups, cSetup)
     }
 
-    /*
 
     //make a way to quickly run through test cases
     moves := make([][]string, 0)
@@ -82,25 +95,36 @@ func main() {
     moves = append(moves, []string{"0", "1", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "2", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "3", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "3", "joinPlatoon", "plat5", ""}) //invalid
-    moves = append(moves, []string{"0", "3", "splitPlatoon", "", ""}) //invalid
-    moves = append(moves, []string{"0", "3", "mergePlatoon", "plat5", ""}) //invalid
+
+    //moves = append(moves, []string{"0", "3", "joinPlatoon", "plat5", ""}) //invalid
+    //moves = append(moves, []string{"0", "3", "splitPlatoon", "", ""}) //invalid
+    //moves = append(moves, []string{"0", "3", "mergePlatoon", "plat5", ""}) //invalid
+
     moves = append(moves, []string{"0", "4", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"0", "5", "joinPlatoon", "plat1", ""})
     moves = append(moves, []string{"10", "10", "joinPlatoon", "plat2", ""})
     moves = append(moves, []string{"0", "11", "joinPlatoon", "plat2", ""})
     moves = append(moves, []string{"0", "12", "joinPlatoon", "plat2", ""})
-    moves = append(moves, []string{"5", "3", "leavePlatoon", "", ""})
-    moves = append(moves, []string{"0", "3", "mergePlatoon", "plat1", ""}) //invalid
-    moves = append(moves, []string{"0", "3", "changeSpeed", "0", ""}) //invalid
-    moves = append(moves, []string{"0", "3", "splitPlatoon", "plat5", ""}) //invalid
+    moves = append(moves, []string{"10", "3", "splitPlatoon", "plat3", ""})
+    moves = append(moves, []string{"0", "4", "splitPlatoon", "plat4", ""})
+    moves = append(moves, []string{"0", "4", "mergePlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "3", "leavePlatoon", "", ""})
+
+    //moves = append(moves, []string{"0", "3", "mergePlatoon", "plat1", ""}) //invalid
+    //moves = append(moves, []string{"0", "3", "changeSpeed", "0", ""}) //invalid
+    //moves = append(moves, []string{"0", "3", "splitPlatoon", "plat5", ""}) //invalid
+
     moves = append(moves, []string{"7", "5", "leavePlatoon", "", ""})
     moves = append(moves, []string{"15", "10", "mergePlatoon", "plat1", ""})
     moves = append(moves, []string{"3", "3", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"10", "11", "splitPlatoon", "plat3", ""})
-    moves = append(moves, []string{"5", "1", "leavePlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "1", "joinPlatoon", "plat3", ""})
-    moves = make([][]string, 0)
+    moves = append(moves, []string{"10", "11", "splitPlatoon", "plat5", ""})
+    moves = append(moves, []string{"0", "1", "splitPlatoon", "plat6", ""})
+    moves = append(moves, []string{"0", "2", "splitPlatoon", "plat7", ""})
+    moves = append(moves, []string{"0", "2", "mergePlatoon", "plat1", ""})
+    moves = append(moves, []string{"0", "1", "leavePlatoon", "", ""})
+    moves = append(moves, []string{"0", "1", "joinPlatoon", "plat4", ""})
+
+    //moves = make([][]string, 0)
 
     //Example of some invalid transactions
     //cannot join a platoon if you are already in one
@@ -200,7 +224,6 @@ func main() {
     }
     fmt.Printf("Wrote %d bytes\n", numBytes)
     f.Sync()
-    */
     for i, curr := range cSetups {
         app := controllers.Application {
             Fabric: curr,
