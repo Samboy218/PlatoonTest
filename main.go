@@ -1,13 +1,12 @@
 package main
 
 import (
-    "time"
     "fmt"
     "PlatoonTest/blockchain"
     "PlatoonTest/web"
     "PlatoonTest/web/controllers"
-    "encoding/json"
     "os"
+    //"sync"
 )
 
 type platoonUser struct {
@@ -27,12 +26,6 @@ type platoon struct {
     Distance float64
     Members []string
 }
-type dbState struct {
-    ActionPerformed string
-    Users []platoonUser
-    Platoons []platoon
-}
-
 
 func main() {
     fSetup := blockchain.FabricSetup{
@@ -61,20 +54,6 @@ func main() {
         fmt.Printf("Unable to install and instantiate the chaincode: %v\n", err)
         return
     }
-    /*
-    var funcs []blockchain.FuncDef
-    funcs = append(funcs, blockchain.FuncDef{Function:"joinPlatoon", Arg1:"Plat1", Arg2:""})
-    funcs = append(funcs, blockchain.FuncDef{Function:"splitPlatoon", Arg1:"Plat2", Arg2:""})
-    funcs = append(funcs, blockchain.FuncDef{Function:"changeSpeed", Arg1:"60", Arg2:""})
-    funcs = append(funcs, blockchain.FuncDef{Function:"leavePlatoon", Arg1:"", Arg2:""})
-
-    ret, err := fSetup.LoadTest(funcs, 100)
-    if err != nil {
-        fmt.Printf("bad stuff: %v\n", err)
-        return
-    }
-    fmt.Printf("%s\n", ret)
-    */
 
     var cSetups []blockchain.ClientSetup
     //var apps []*controllers.Application
@@ -86,144 +65,25 @@ func main() {
         }
         cSetups = append(cSetups, cSetup)
     }
+    /*
+    var funcs []blockchain.FuncDef
+    funcs = append(funcs, blockchain.FuncDef{Function:"joinPlatoon", Arg1:"Plat1", Arg2:""})
+    funcs = append(funcs, blockchain.FuncDef{Function:"changeSpeed", Arg1:"60", Arg2:""})
+    funcs = append(funcs, blockchain.FuncDef{Function:"leavePlatoon", Arg1:"", Arg2:""})
 
+    numUsers := 2
+    numLoops := 10
 
-    //make a way to quickly run through test cases
-    moves := make([][]string, 0)
-    //moves[0] = []string{"delay", "user", "function", "args"}
-    moves = append(moves, []string{"0", "0", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "1", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "2", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "3", "joinPlatoon", "plat1", ""})
-
-    //moves = append(moves, []string{"0", "3", "joinPlatoon", "plat5", ""}) //invalid
-    //moves = append(moves, []string{"0", "3", "splitPlatoon", "", ""}) //invalid
-    //moves = append(moves, []string{"0", "3", "mergePlatoon", "plat5", ""}) //invalid
-
-    moves = append(moves, []string{"0", "4", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "5", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"10", "10", "joinPlatoon", "plat2", ""})
-    moves = append(moves, []string{"0", "11", "joinPlatoon", "plat2", ""})
-    moves = append(moves, []string{"0", "12", "joinPlatoon", "plat2", ""})
-    moves = append(moves, []string{"10", "3", "splitPlatoon", "plat3", ""})
-    moves = append(moves, []string{"0", "4", "splitPlatoon", "plat4", ""})
-    moves = append(moves, []string{"0", "4", "mergePlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "3", "leavePlatoon", "", ""})
-
-    //moves = append(moves, []string{"0", "3", "mergePlatoon", "plat1", ""}) //invalid
-    //moves = append(moves, []string{"0", "3", "changeSpeed", "0", ""}) //invalid
-    //moves = append(moves, []string{"0", "3", "splitPlatoon", "plat5", ""}) //invalid
-
-    moves = append(moves, []string{"7", "5", "leavePlatoon", "", ""})
-    moves = append(moves, []string{"15", "10", "mergePlatoon", "plat1", ""})
-    moves = append(moves, []string{"3", "3", "joinPlatoon", "plat1", ""})
-    moves = append(moves, []string{"10", "11", "splitPlatoon", "plat5", ""})
-    moves = append(moves, []string{"0", "1", "splitPlatoon", "plat6", ""})
-    moves = append(moves, []string{"0", "2", "splitPlatoon", "plat7", ""})
-    moves = append(moves, []string{"0", "2", "mergePlatoon", "plat1", ""})
-    moves = append(moves, []string{"0", "1", "leavePlatoon", "", ""})
-    moves = append(moves, []string{"0", "1", "joinPlatoon", "plat4", ""})
-
-    //moves = make([][]string, 0)
-
-    //Example of some invalid transactions
-    //cannot join a platoon if you are already in one
-    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat1", ""}) //valid
-    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat2", ""}) //invalid
-    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat3", ""}) //invalid
-    //moves = append(moves, []string{"0", "6", "joinPlatoon", "plat4", ""}) //invalid
-    //cannot merge unless you are leader
-    //moves = append(moves, []string{"0", "6", "mergePlatoon", "plat3", ""}) //invalid
-    //cannot merge into self
-    //moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
-    //moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //valid
-    //cannot leave/split/merge if you aren't in a platoon
-    //moves = append(moves, []string{"0", "6", "leavePlatoon", "", ""}) //invalid
-    //moves = append(moves, []string{"0", "6", "mergePlatoon", "plat1", ""}) //invalid
-    //moves = append(moves, []string{"0", "6", "splitPlatoon", "plat1", ""}) //invalid
-
-    var runs []dbState
-    startTime := time.Now()
-    for _, move := range moves {
-        var tempRun dbState
-        var ind int
-        var delay int
-        fmt.Sscan(move[0], &delay)
-        fmt.Sscan(move[1], &ind)
-        tempRun.ActionPerformed = fmt.Sprintf("%s did %s on %s after %s seconds", cSetups[ind].UserName, move[2], move[3], move[0])
-        fmt.Printf("Sleeping %d before doing move {%v}\n", delay, move)
-        time.Sleep(time.Duration(delay) * time.Second)
-        fmt.Printf("doing move {%v}\n", move)
-        ID, err := cSetups[ind].Invoke(move[2], move[3], move[4])
-        if err != nil {
-            fmt.Printf("Failed to execute move {%v}: %v\n", move, err)
-            tempRun.ActionPerformed = fmt.Sprintf("%s: FAILED", tempRun.ActionPerformed)
-        }else {
-            fmt.Printf("Successful transaction, ID: %s\n", ID)
-        }
-        //get all of the data and put it into a file
-        payload, err := cSetups[ind].QueryVal("users")
-        if err != nil {
-            fmt.Printf("Couldn't query users: %v\n", err)
-            return
-        }
-        if payload != "" {
-            err = json.Unmarshal([]byte(payload), &tempRun.Users)
-            if err != nil {
-                fmt.Printf("unable to decode JSON response: %v\n", err)
-                return
-            }
-        }
-        payload, err = cSetups[ind].QueryVal("platoons")
-        if err != nil {
-            fmt.Printf("Couldn't query platoons: %v\n", err)
-            return
-        }
-        var platoonIDs []string
-        if payload != "" {
-            err = json.Unmarshal([]byte(payload), &platoonIDs)
-            if err != nil {
-                fmt.Printf("unable to decode JSON response: %v\n", err)
-                return
-            }
-        }
-        for _, curr := range platoonIDs {
-            var temp platoon
-            payload, err = cSetups[ind].QueryVal(curr)
-            if err != nil {
-                fmt.Printf("couldn't query %s: %v\n", curr, err)
-            }
-            if payload != "" {
-                err = json.Unmarshal([]byte(payload), &temp)
-                if err != nil {
-                    fmt.Printf("unable to decode JSON response: %v\n", err)
-                    return
-                }
-                tempRun.Platoons = append(tempRun.Platoons, temp)
-            }
-        }
-        runs = append(runs, tempRun)
+    var wg sync.WaitGroup
+    wg.Add(numUsers)
+    for i := 0; i < numUsers; i++ {
+        go func(client blockchain.ClientSetup, funcs []blockchain.FuncDef, numLoops int) {
+            defer wg.Done()
+            client.LoadTest(funcs, numLoops)
+        }(cSetups[i], funcs, numLoops)
     }
-    endTime := time.Now()
-    elapsed := endTime.Sub(startTime)
-    fmt.Printf("Run took %f seconds\n", elapsed.Seconds())
-
-    dump, err := json.Marshal(runs)
-    if err != nil {
-        fmt.Printf("Couldn't encode JSON: %v\n", err)
-    }
-
-    f, err := os.Create("run.json")
-    if err != nil {
-        fmt.Printf("Couldn't open file: %v\n", err)
-    }
-    defer f.Close()
-    numBytes, err := f.WriteString(string(dump))
-    if err != nil {
-        fmt.Printf("Couldn't write to file: %v\n", err)
-    }
-    fmt.Printf("Wrote %d bytes\n", numBytes)
-    f.Sync()
+    wg.Wait()
+    */
     for i, curr := range cSetups {
         app := controllers.Application {
             Fabric: curr,
@@ -237,4 +97,5 @@ func main() {
     fmt.Scanf("%s")
 
 }
+
 
