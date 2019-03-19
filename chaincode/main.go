@@ -23,6 +23,7 @@ type SamTestChaincode struct {
     stub shim.ChaincodeStubInterface
     pendingUserChanges []platoonUser
     pendingPlatChanges []platoon
+    pendingPlatList    []string
     leaderBonus float64
     //in a production system, this would be whatever data structures
     //  are needed to calculate the expected fuel savings
@@ -751,32 +752,26 @@ func (t* SamTestChaincode) newUser(user platoonUser) error {
 //helper function, not a chaincode function
 //creates a new platoon in the database if it isn't already there
 func (t* SamTestChaincode) newPlat(platID string) error {
-    platList, err := t.stub.GetState("platoons")
-    if err != nil {
-        return fmt.Errorf("unable to get list of platoons: %v", err)
-    }
-    var platArray []string
-    if string(platList) != "" {
-        err = json.Unmarshal(platList, &platArray)
+    if len(t.pendingPlatList) == 0 {
+        platList, err := t.stub.GetState("platoons")
         if err != nil {
-            return fmt.Errorf("error decoding JSON data: %v", err)
+            return fmt.Errorf("unable to get list of platoons: %v", err)
         }
-        for _, currPlat := range platArray {
-            if currPlat == platID {
-                return nil
+        if string(platList) != "" {
+            err = json.Unmarshal(platList, &t.pendingPlatList)
+            if err != nil {
+                return fmt.Errorf("error decoding JSON data: %v", err)
             }
         }
     }
+    for _, currPlat := range t.pendingPlatList {
+        if currPlat == platID {
+            return nil
+        }
+    }
     //plat doesn't exist, make it
-    platArray = append(platArray, platID)
-    state, err := json.Marshal(platArray)
-    if err != nil {
-        return fmt.Errorf("error encoding JSON: %v", err)
-    }
-    err = t.stub.PutState("platoons", state)
-    if err != nil {
-        return fmt.Errorf("Unable to update platoon list: %v", err)
-    }
+    t.pendingPlatList = append(t.pendingPlatList, platID)
+    
     var plat platoon
     plat.ID = platID
     //default spped multiplied by 100 in order to speed testing up
@@ -1112,15 +1107,53 @@ func (t *SamTestChaincode) commitChanges() error {
         }
     }
     if len(t.pendingPlatChanges) > 0 {
+        toDelete := make([]string, 0)
         for _, curr := range t.pendingPlatChanges {
-            state, err := json.Marshal(curr)
-            if err != nil {
-                return fmt.Errorf("unable to encode JSON: %v", err)
+            //so if there are no members in the platoon, just delete it
+            if len(curr.Members) == 0 {
+                fmt.Printf("Platoon: %s has no members\n", curr.ID)
+                err := t.stub.DelState(curr.ID)
+                if err != nil {
+                    return fmt.Errorf("Unable to delete state {%s}: %v", curr.ID, err)
+                }
+                toDelete = append(toDelete, curr.ID)
+            }else {
+                state, err := json.Marshal(curr)
+                if err != nil {
+                    return fmt.Errorf("unable to encode JSON: %v", err)
+                }
+                err = t.stub.PutState(curr.ID, state)
+                if err != nil {
+                    return fmt.Errorf("unable to update platoon {%s}: %v", curr.ID, err)
+                }
             }
-            err = t.stub.PutState(curr.ID, state)
+        }
+        if len(t.pendingPlatChanges) == 0 {
+            platList, err := t.stub.GetState("platoons")
             if err != nil {
-                return fmt.Errorf("unable to update platoon {%s}: %v", curr.ID, err)
+                return fmt.Errorf("unable to get list of platoons: %v", err)
             }
+            if string(platList) != "" {
+                err = json.Unmarshal(platList, &t.pendingPlatList)
+                if err != nil {
+                    return fmt.Errorf("error decoding JSON data: %v", err)
+                }
+            }
+        }
+        var finalList []string
+        for _, curr := range t.pendingPlatList {
+            if contains(toDelete, curr) != true {
+                finalList = append(finalList, curr)
+            }
+        }
+        state, err := json.Marshal(finalList)
+        if err != nil {
+            return fmt.Errorf("unable to encode JSON: %v", err)
+        }
+        fmt.Printf("putting %s into platoons\n", state)
+        err = t.stub.PutState("platoons", state)
+        if err != nil {
+            return fmt.Errorf("unable to update platoons list: %v", err)
         }
     }
     return nil

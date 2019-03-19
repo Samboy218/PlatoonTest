@@ -6,6 +6,8 @@ import (
     "PlatoonTest/web"
     "PlatoonTest/web/controllers"
     "os"
+    "math/rand"
+    "time"
     //"sync"
 )
 
@@ -72,7 +74,6 @@ func main() {
     funcs = append(funcs, blockchain.FuncDef{Function:"leavePlatoon", Arg1:"", Arg2:""})
 
     numUsers := 2
-    numLoops := 10
 
     var wg sync.WaitGroup
     wg.Add(numUsers)
@@ -84,6 +85,16 @@ func main() {
     }
     wg.Wait()
     */
+    rand.Seed(time.Now().UnixNano())
+    numLoops := 10
+    for i := 0; i < numLoops; i++ {
+        id, err := cSetups[rand.Intn(len(cSetups))].InvokeRandomValid()
+        if err != nil {
+            fmt.Printf("Error doing random transaction: %v", err)
+            return
+        }
+        fmt.Printf("Did Transaction: %s", id)
+    }
     for i, curr := range cSetups {
         app := controllers.Application {
             Fabric: curr,
