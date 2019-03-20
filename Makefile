@@ -1,5 +1,5 @@
 SHELL=/bin/bash
-.PHONY: all dev clean build env-up env-down run
+.PHONY: all dev clean build env-up env-down run install
 
 all: clean build env-up run
 
