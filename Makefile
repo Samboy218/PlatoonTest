@@ -32,9 +32,9 @@ install:
 	sudo apt -y install docker-compose
 	sudo usermod -a -G docker ${USER}
 	sudo tar -C /usr/local -xzf install/go1.10.5.linux-amd64.tar.gz
-	echo 'export GOPATH=$HOME/go' >> ~/.profile
-	echo 'export PATH=$PATH:$GOPATH/bin' >> ~/.profile
-	echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile
+	echo 'export GOPATH=$$HOME/go' >> ~/.profile
+	echo 'export PATH=$$PATH:$$GOPATH/bin' >> ~/.profile
+	echo 'export PATH=$$PATH:/usr/local/go/bin' >> ~/.profile
 	source ~/.profile
 	mkdir $(GOPATH)/bin
 	curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
