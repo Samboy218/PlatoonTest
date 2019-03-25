@@ -92,7 +92,7 @@ func (setup *FabricSetup) InstallAndInstantiateCC() error {
 		return fmt.Errorf("failed to create chaincode package: %v", err)
 	}
 
-    version := "3.12"
+    version := "3.21"
     //3.0 huh, thats a lot of edits
     //yay 2.0! it doesn't mean anything though
 	// Install our chaincode on org peers

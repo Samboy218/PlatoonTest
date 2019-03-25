@@ -172,6 +172,16 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     t.efficiencyMatrix["inefficient"]["efficient"] = .90
     t.efficiencyMatrix["inefficient"]["inefficient"] = .95
 
+    t.pendingUserChanges = make([]platoonUser, 0)
+    t.pendingPlatChanges = make([]platoon, 0)
+    t.pendingPlatList = make([]string, 0)
+
+    userID, err := t.getUfromCert()
+    if err != nil {
+        return shim.Error(fmt.Sprintf("Error getting userID: %v", err))
+    }
+
+    fmt.Printf("Args: %s, %s, %s (pendingList: %d)\n", userID, args[0], args[1], len(t.pendingPlatList))
     if args[0] == "query" {
         return t.query(args)
     }else if args[0] == "joinPlatoon" {
@@ -187,7 +197,7 @@ func (t *SamTestChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
     }else {
         return shim.Error("Failed to invoke, check argument 1")
     }
-    err := t.commitChanges()
+    err = t.commitChanges()
     if err != nil {
         return shim.Error(fmt.Sprintf("Failed to commit changes: %v", err))
     }
@@ -416,12 +426,16 @@ func (t *SamTestChaincode) mergePlatoon(args []string) pb.Response {
         return shim.Error(fmt.Sprintf("couldn't get user {%s}: %v", userID, err))
     }
     //platB is the platoon the caller is the leader of
-    //platA is args[1]
     //platB is caller.CurPlat
+    //platA is args[1] (target platoon)
     //end result of this function is platA = [platA+platB]; platB = []
     toMerge := currUser.CurrPlat
     if toMerge == "" {
         return shim.Error(fmt.Sprintf("User {%s} not in any platoon"))
+    }
+    //make sure the two platoons are not the same
+    if toMerge == args[1] {
+        return shim.Error(fmt.Sprintf("Cannot merge platoon %s into self", args[1]))
     }
     platB, err := t.getPlat(toMerge)
 
@@ -481,7 +495,7 @@ func (t *SamTestChaincode) mergePlatoon(args []string) pb.Response {
     //convert seconds->hours, multiply by mph
     distanceTraveled = float64(timeSince)/3600 * float64(platB.CurrSpeed)
     distanceTraveled += platB.Distance
-    platBPayments, err := t.calcPayment(platA.Members, distanceTraveled)
+    platBPayments, err := t.calcPayment(platB.Members, distanceTraveled)
     if err != nil {
         return shim.Error(fmt.Sprintf("Could not calculate payment: %v", err))
     }
@@ -793,7 +807,7 @@ func (t* SamTestChaincode) newPlat(platID string) error {
 func (t* SamTestChaincode) getPlat(platID string) (platoon, error) {
     for _, currPlat := range t.pendingPlatChanges {
         if currPlat.ID == platID {
-            //user exists in pending changes
+            //plat exists in pending changes
             return currPlat, nil
         }
     }
@@ -1163,6 +1177,10 @@ func (t *SamTestChaincode) commitChanges() error {
 //takes in a list of platoon members, and a distance traveled, and returns an array of payments to be made to the leader
 func (t *SamTestChaincode) calcPayment(plat []string, distance float64) ([]float64, error) {
     //get all of the users from the platoon
+    //if the platoon is only one person, no need to pay
+    if len(plat) == 1 {
+        return []float64{0.0}, nil
+    }
     fmt.Println(fmt.Sprintf("Distance Traveled: %f miles", distance))
     var users []platoonUser
     var fuelUsedNormal []float64
