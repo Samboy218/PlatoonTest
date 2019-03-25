@@ -59,7 +59,7 @@ func main() {
 
     var cSetups []blockchain.ClientSetup
     //var apps []*controllers.Application
-    for i := 1; i < 16; i++ {
+    for i := 1; i <= 100; i++ {
         cSetup, err := fSetup.InitializeUser(fmt.Sprintf("User%d", i))
         if err != nil {
             fmt.Printf("Unable to create new user {User%s}: %v\n", i, err)

@@ -73,7 +73,7 @@ func (t *SamTestChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
     classes[0] = "efficient"
     classes[1] = "default"
     classes[2] = "inefficient"
-    for i := 1; i < 16; i++ {
+    for i := 1; i <= 100; i++ {
         fakeUsers = append(fakeUsers, platoonUser{ID:fmt.Sprintf("User%d@org1.samtest.com", i), EfficiencyClass:classes[i%3]})
     }
     /*
