@@ -202,7 +202,7 @@ func (setup *ClientSetup) InvokeRandomValid() (string, error) {
             if choice == 0 && len(platoonIDs) > 1{
                 toMerge := rand.Intn(len(platoonIDs))
                 //make sure we aren't merging with ourselves
-                for platoonIDs[toMerge] != currUser.CurrPlat {
+                for platoonIDs[toMerge] == currUser.CurrPlat {
                     toMerge = rand.Intn(len(platoonIDs))
                 }
                 return setup.Invoke("mergePlatoon", platoonIDs[toMerge], "")
