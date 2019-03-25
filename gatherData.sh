@@ -5,6 +5,7 @@ test_time=3600
 
 start_time=`date +%s`
 curr_time=`date +%s`
+echo "ID,NAME,CPU,MEM"
 
 while [ $(($curr_time-$start_time)) -lt $test_time ]
 do
@@ -13,7 +14,6 @@ do
     do
         echo $curr_time","$i
     done
-    sleep 1
     curr_time=`date +%s`
 
 done

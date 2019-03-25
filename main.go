@@ -86,8 +86,8 @@ func main() {
     wg.Wait()
     */
     rand.Seed(time.Now().UnixNano())
-    numLoops := 10
-    for i := 0; i < numLoops; i++ {
+    numLoops := -1
+    for i := 0; i < numLoops || numLoops == -1; i++ {
         id, err := cSetups[rand.Intn(len(cSetups))].InvokeRandomValid()
         if err != nil {
             fmt.Printf("Error doing random transaction: %v", err)
